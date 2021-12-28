@@ -21,25 +21,24 @@ class gezdownloader:
         self.args = dict()
         self.args.update(kwargs)
         
+        if self.args['q']: self.args['download'] = os.getcwd()
+        
         for i in ['configdir', 'download']:
             self.args[i]  = os.path.abspath(self.args[i])
         
         self.args['logfile']  = os.path.join(self.args['configdir'],"processed.log")
-        
         self.args['baseurl']  = "https://mediathekviewweb.de/feed?query="
         
         self.DF_links = None
         
-        if os.path.exists(self.args['logfile']):
+        if os.path.exists(self.args['logfile']) & ~self.args['q']:
             with open(self.args['logfile']) as f:
                 self.processed = f.readlines()
         else:
             self.processed=[]
-
-        for i in ['configdir', 'download']:
-            if not os.path.exists(self.args[i]): os.mkdir(self.args[i])
-            
-        if self.args['info']: self.get_info()
+           
+        if self.args['search'] != None: self.get_info()
+          
         if self.args['run']: self.download_movies()
         
     
@@ -97,23 +96,31 @@ class gezdownloader:
         DF_links.sort_values('timestamp',inplace=True)
             
         self.DF_links = DF_links.reset_index(drop=True)
+        
+    def ensure_dir(self,DIR):
+        dirlist = os.path.normpath(DIR).split(os.sep)
+        for i in range(len(dirlist)):
+            tmpdir = os.path.abspath(os.sep.join(dirlist[:i+1]))
+            if not os.path.exists(tmpdir):
+                os.mkdir(tmpdir)
+                print('Create {:}'.format(tmpdir))
     
     def wget(self,URL,TITLE):
         """
         download URL
         """
         if self.args['file']:
+            self.ensure_dir(self.args['download'])
             FILENAME=os.path.join(self.args['download'],re.sub(r'[\\/*?:"<>|& ]',"_",TITLE+'.mp4'))
             result = subprocess.run(["wget", "-c" ,"-O", FILENAME, URL],
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
         else:
             DIR=os.path.join(self.args['download'],TITLE)
-            if not os.path.exists(DIR): os.mkdir(DIR)
+            self.ensure_dir(DIR)
             result = subprocess.run(["wget", "-c" ,"-P", DIR, URL],
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
-
 
     def get_info(self):
         self.get_links()
@@ -130,8 +137,10 @@ class gezdownloader:
 
             self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
             
-            with open(self.args['logfile'], "a") as file:
-                file.write(self.DF_links.loc[i,'id'])
+            if not self.args['q']:
+                self.ensure_dir(self.args['configdir'])
+                with open(self.args['logfile'], "a") as file:
+                    file.write(self.DF_links.loc[i,'id'])
 
 
 def main():
@@ -142,7 +151,7 @@ def main():
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
-    parser.add_argument("--info", help="Print source informations", action="store_true")
+    parser.add_argument("-q", help="Quick mode: Do not memorize downloaded content and download to current directory", action="store_true")
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
     parser.add_argument("--run", help="run downloads", action="store_true")
 
@@ -150,7 +159,8 @@ def main():
 
     # init object
     mdl = gezdownloader(**vars(args))
+    return mdl
 
 
 if __name__ == '__main__':
-    main()
+    mdl = main()
