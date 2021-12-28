@@ -16,7 +16,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
-class gezdownloader:
+class mdownloader:
     def __init__(self, **kwargs):
         self.args = dict()
         self.args.update(kwargs)
@@ -29,7 +29,7 @@ class gezdownloader:
         self.args['logfile']  = os.path.join(self.args['configdir'],"processed.log")
         self.args['baseurl']  = "https://mediathekviewweb.de/feed?query="
         
-        self.DF_links = None
+        self.DF_links = pd.DataFrame()
         
         if os.path.exists(self.args['logfile']) & ~self.args['q']:
             with open(self.args['logfile']) as f:
@@ -62,40 +62,41 @@ class gezdownloader:
             DF_links = DF_links.append(DF_tmp, ignore_index=True)
             skip+=50
             if len(DF_tmp)==0: break
-    
-        # Converting size in MB
-        DF_links['size'] = DF_links['size'] / (1024*1024)
-        
-        # Converting timestamps
-        DF_links['timestamp'] = DF_links['timestamp'].apply(lambda x: pd.to_datetime(datetime.datetime.utcfromtimestamp(int(x))))
-        
-        # renaming columns
-        DF_links.rename(columns={'url_video_hd': 'link'}, inplace=True)
-        
-        # dropping useles columns
-        DF_links = DF_links[['id','title','link','duration','timestamp','size']]
-        
-        #exclude useless sources
-        for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)'])):
-            DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
-        
-        # formatting id columns
-        DF_links['id'] = DF_links['id'] + '\n'
-        
-        # exclude all processed sources
-        DF_links = DF_links[~DF_links['id'].isin(self.processed)]
-        
-        # cleanup titles
-        DF_links['title'] = DF_links['title'].str.replace("/",' ')  
-        
-        # dropping prewiew sources
-        DF_links = DF_links[DF_links['duration'].astype(int)>(self.args['min_duration']*60)].reset_index(drop=True)
-        
-        
-        # sort after publish date
-        DF_links.sort_values('timestamp',inplace=True)
+
+        if not DF_links.empty:
+            # Converting size in MB
+            DF_links['size'] = DF_links['size'] / (1024*1024)
             
-        self.DF_links = DF_links.reset_index(drop=True)
+            # Converting timestamps
+            DF_links['timestamp'] = DF_links['timestamp'].apply(lambda x: pd.to_datetime(datetime.datetime.utcfromtimestamp(int(x))))
+            
+            # renaming columns
+            DF_links.rename(columns={'url_video_hd': 'link'}, inplace=True)
+            
+            # dropping useles columns
+            DF_links = DF_links[['id','title','link','duration','timestamp','size']]
+            
+            #exclude useless sources
+            for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)'])):
+                DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
+            
+            # formatting id columns
+            DF_links['id'] = DF_links['id'] + '\n'
+            
+            # exclude all processed sources
+            DF_links = DF_links[~DF_links['id'].isin(self.processed)]
+            
+            # cleanup titles
+            DF_links['title'] = DF_links['title'].str.replace("/",' ')  
+            
+            # dropping prewiew sources
+            DF_links = DF_links[DF_links['duration'].astype(int)>(self.args['min_duration']*60)].reset_index(drop=True)
+            
+            
+            # sort after publish date
+            DF_links.sort_values('timestamp',inplace=True)
+                
+            self.DF_links = DF_links.reset_index(drop=True)
         
     def ensure_dir(self,DIR):
         dirlist = os.path.normpath(DIR).split(os.sep)
@@ -124,8 +125,11 @@ class gezdownloader:
 
     def get_info(self):
         self.get_links()
-        print(self.DF_links[['title']])
-        print("Download {:d} movies ({:.1f}GB)".format(len(self.DF_links),float(self.DF_links['size'].sum()/1024)))       
+        if not self.DF_links.empty:
+            print(self.DF_links[['title']])
+            print("Download {:d} movies ({:.1f}GB)".format(len(self.DF_links),float(self.DF_links['size'].sum()/1024)))
+        else:
+            print("No sources found!")
         
     def download_movies(self):
         if ~isinstance(self.DF_links, pd.DataFrame): 
@@ -158,7 +162,7 @@ def main():
     args = parser.parse_args()
 
     # init object
-    mdl = gezdownloader(**vars(args))
+    mdl = mdownloader(**vars(args))
     return mdl
 
 
