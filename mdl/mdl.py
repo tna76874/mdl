@@ -132,11 +132,7 @@ class mdownloader:
             print("No sources found!")
         
     def download_movies(self):
-        if ~isinstance(self.DF_links, pd.DataFrame): 
-            self.get_info()
-
         for i in self.DF_links.index:
-            
             print("Start downloading: {:}".format(self.DF_links.loc[i,'title']))
 
             self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
