@@ -163,8 +163,7 @@ def main():
 
     # init object
     mdl = mdownloader(**vars(args))
-    return mdl
 
 
 if __name__ == '__main__':
-    mdl = main()
+    main()
