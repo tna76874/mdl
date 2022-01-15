@@ -95,6 +95,8 @@ class mdownloader:
             
             # sort after publish date
             DF_links.sort_values('timestamp',inplace=True)
+            
+            if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
         
@@ -154,6 +156,7 @@ def main():
     parser.add_argument("-q", help="Quick mode: Do not memorize downloaded content and download to current directory", action="store_true")
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
     parser.add_argument("--run", help="run downloads", action="store_true")
+    parser.add_argument("--title", help="Cut unneccessary parts from title", action="store_true")
 
     args = parser.parse_args()
 
