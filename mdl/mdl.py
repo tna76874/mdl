@@ -149,7 +149,7 @@ def main():
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
     parser.add_argument("--search", help="Comma seperated search keywords", default="spielfilm-highlights",type=str)
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
-    parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita)",type=str)
+    parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
     parser.add_argument("-q", help="Quick mode: Do not memorize downloaded content and download to current directory", action="store_true")
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
