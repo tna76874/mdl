@@ -38,6 +38,8 @@ class mdownloader:
             self.processed=[]
            
         if self.args['search'] != None: self.get_info()
+        
+        if self.args['skip']: self.mark_as_done()
           
         if self.args['run']: self.download_movies()
         
@@ -77,7 +79,7 @@ class mdownloader:
             DF_links = DF_links[['id','title','link','duration','timestamp','size']]
             
             #exclude useless sources
-            for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)'])):
+            for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)'])):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
             
             # formatting id columns
@@ -91,7 +93,6 @@ class mdownloader:
             
             # dropping prewiew sources
             DF_links = DF_links[DF_links['duration'].astype(int)>(self.args['min_duration']*60)].reset_index(drop=True)
-            
             
             # sort after publish date
             DF_links.sort_values('timestamp',inplace=True)
@@ -132,20 +133,25 @@ class mdownloader:
             print("Download {:d} movies ({:.1f}GB)".format(len(self.DF_links),float(self.DF_links['size'].sum()/1024)))
         else:
             print("No sources found!")
+
+    def mark_as_done(self):
+        self.ensure_dir(self.args['configdir'])
+        with open(self.args['logfile'], "a") as file:
+            file.write("".join(self.DF_links['id'].values))
         
     def download_movies(self):
         for i in self.DF_links.index:
             print("Start downloading: {:}".format(self.DF_links.loc[i,'title']))
 
             self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
-            
+
             if not self.args['q']:
                 self.ensure_dir(self.args['configdir'])
                 with open(self.args['logfile'], "a") as file:
                     file.write(self.DF_links.loc[i,'id'])
 
 
-def main():
+def main(headless=True):
     parser = argparse.ArgumentParser()
     parser.add_argument("--configdir", help="directory where config is stored", default=os.path.join(os.environ['HOME'],'.config','mdl'),type=str)
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
@@ -157,12 +163,13 @@ def main():
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
     parser.add_argument("--run", help="run downloads", action="store_true")
     parser.add_argument("--title", help="Cut unneccessary parts from title", action="store_true")
+    parser.add_argument("--skip", help="Mark found IDs as done.", action="store_true")
 
     args = parser.parse_args()
-
+  
     # init object
-    mdl = mdownloader(**vars(args))
+    if headless: _ = mdownloader(**vars(args))
+    else: return mdownloader(**vars(args))
 
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":   
+    mdl = main(headless=False)
