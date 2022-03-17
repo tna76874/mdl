@@ -18,7 +18,9 @@ pd.set_option('display.max_colwidth', None)
 
 class mdownloader:
     def __init__(self, **kwargs):
-        self.args = dict()
+        self.args = {
+                    'free' : float(20),
+                    }
         self.args.update(kwargs)
         
         if self.args['q']: self.args['download'] = os.getcwd()
@@ -138,17 +140,27 @@ class mdownloader:
         self.ensure_dir(self.args['configdir'])
         with open(self.args['logfile'], "a") as file:
             file.write("".join(self.DF_links['id'].values))
-        
+
+    def check_free_space(self):
+        """
+        return free disk space in GB
+        """
+        disk = os.statvfs(self.args['download']+'/')
+        return float(disk.f_bsize*disk.f_bfree)/1024/1024/1024
+
     def download_movies(self):
         for i in self.DF_links.index:
             print("Start downloading: {:}".format(self.DF_links.loc[i,'title']))
 
-            self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
+            if (self.check_free_space() - self.DF_links.loc[i,'size'] / 1024) > float(self.args['free']):
+                self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
 
-            if not self.args['q']:
-                self.ensure_dir(self.args['configdir'])
-                with open(self.args['logfile'], "a") as file:
-                    file.write(self.DF_links.loc[i,'id'])
+                if not self.args['q']:
+                    self.ensure_dir(self.args['configdir'])
+                    with open(self.args['logfile'], "a") as file:
+                        file.write(self.DF_links.loc[i,'id'])
+            else:
+                print("No free disk space. Skip download.")
 
 
 def main(headless=True):
@@ -159,6 +171,7 @@ def main(headless=True):
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
+    parser.add_argument("--free", help="Minimum free disk space (GB)", default=20,type=float)
     parser.add_argument("-q", help="Quick mode: Do not memorize downloaded content and download to current directory", action="store_true")
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
     parser.add_argument("--run", help="run downloads", action="store_true")
