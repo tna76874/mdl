@@ -20,8 +20,14 @@ class mdownloader:
     def __init__(self, **kwargs):
         self.args = {
                     'free' : float(20),
+                    'quality' : 'H',
                     }
         self.args.update(kwargs)
+        
+        self.quality =  {
+                        'H' : '6660k_p37v17',
+                        'M' : '2360k_p35v17',
+                        }
         
         if self.args['q']: self.args['download'] = os.getcwd()
         
@@ -63,7 +69,7 @@ class mdownloader:
                         'duration_max': 10000,
                         }
             DF_tmp = pd.DataFrame(requests.post('https://mediathekviewweb.de/api/query',  json=data, headers={'content-type': 'text/plain'}).json()['result']['results'])
-            DF_links = DF_links.append(DF_tmp, ignore_index=True)
+            DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
             skip+=50
             if len(DF_tmp)==0: break
 
@@ -102,6 +108,7 @@ class mdownloader:
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
+            self.DF_links['link'] = self.DF_links['link'].apply(lambda k: k.replace(self.quality['H'],self.quality[self.args['quality']]))
         
     def ensure_dir(self,DIR):
         dirlist = os.path.normpath(DIR).split(os.sep)
@@ -168,6 +175,7 @@ def main(headless=True):
     parser.add_argument("--configdir", help="directory where config is stored", default=os.path.join(os.environ['HOME'],'.config','mdl'),type=str)
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
     parser.add_argument("--search", help="Comma seperated search keywords", default="spielfilm-highlights",type=str)
+    parser.add_argument("--quality", help="Set quality: high (H), medium (M)", default="M",type=str)
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
@@ -185,4 +193,4 @@ def main(headless=True):
     else: return mdownloader(**vars(args))
 
 if __name__ == "__main__":   
-    mdl = main(headless=False)
+    self = main(headless=False)
