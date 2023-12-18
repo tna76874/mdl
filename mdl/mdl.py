@@ -10,6 +10,7 @@ import requests
 import subprocess
 import datetime
 import re
+import ast
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -28,6 +29,7 @@ class mdownloader:
                         'H' : '6660k_p37v17',
                         'M' : '2360k_p35v17',
                         }
+        self.quality.update(self.args['quality_dict'])
         
         if self.args['q']: self.args['download'] = os.getcwd()
         
@@ -171,11 +173,19 @@ class mdownloader:
 
 
 def main(headless=True):
+    def parse_dict(arg):
+        try:
+            return ast.literal_eval(arg)
+        except (ValueError, SyntaxError):
+            raise argparse.ArgumentTypeError("Invalid dictionary format")
+
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--configdir", help="directory where config is stored", default=os.path.join(os.environ['HOME'],'.config','mdl'),type=str)
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
     parser.add_argument("--search", help="Comma seperated search keywords", default="spielfilm-highlights",type=str)
     parser.add_argument("--quality", help="Set quality: high (H), medium (M)", default="M",type=str)
+    parser.add_argument('--quality_dict', type=parse_dict, help='Quality Dicitonary with high and low replacements', default={})
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
@@ -194,3 +204,4 @@ def main(headless=True):
 
 if __name__ == "__main__":   
     self = main(headless=False)
+    # mdl --quality_dict "{ 'H' : '3360k_p36v15', 'M' : '2360k_p35v15' }"
