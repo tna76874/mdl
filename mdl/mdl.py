@@ -25,8 +25,9 @@ class mdownloader:
         self.args.update(kwargs)
         
         self.quality =  {
-                        'H' : '6660k_p37v17',
-                        'M' : '2360k_p35v17',
+                        'H' : 'url_video_hd',
+                        'M' : 'url_video',
+                        'L' : 'url_video_low',
                         }
         
         if self.args['q']: self.args['download'] = os.getcwd()
@@ -81,7 +82,7 @@ class mdownloader:
             DF_links['timestamp'] = DF_links['timestamp'].apply(lambda x: pd.to_datetime(datetime.datetime.utcfromtimestamp(int(x))))
             
             # renaming columns
-            DF_links.rename(columns={'url_video_hd': 'link'}, inplace=True)
+            DF_links.rename(columns={self.quality[self.args['quality']]: 'link'}, inplace=True)
             
             # dropping useles columns
             DF_links = DF_links[['id','title','link','duration','timestamp','size']]
@@ -108,7 +109,6 @@ class mdownloader:
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
-            self.DF_links['link'] = self.DF_links['link'].apply(lambda k: k.replace(self.quality['H'],self.quality[self.args['quality']]))
         
     def ensure_dir(self,DIR):
         dirlist = os.path.normpath(DIR).split(os.sep)
@@ -175,7 +175,7 @@ def main(headless=True):
     parser.add_argument("--configdir", help="directory where config is stored", default=os.path.join(os.environ['HOME'],'.config','mdl'),type=str)
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
     parser.add_argument("--search", help="Comma seperated search keywords", default="spielfilm-highlights",type=str)
-    parser.add_argument("--quality", help="Set quality: high (H), medium (M)", default="M",type=str)
+    parser.add_argument("--quality", help="Set quality: high (H), medium (M), low (L)", default="M",type=str, choices=["H", "M", "L"])
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
     parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
