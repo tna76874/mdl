@@ -48,7 +48,9 @@ class mdownloader:
            
         if self.args['search'] != None: self.get_info()
         
-        if self.args['skip']: self.mark_as_done()
+        if self.args['mark_done']: self.mark_as_done()
+
+        if self.args['mark_undone']: self.mark_as_undone()
           
         if self.args['run']: self.download_movies()
         
@@ -109,7 +111,7 @@ class mdownloader:
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
-        
+
     def ensure_dir(self,DIR):
         dirlist = os.path.normpath(DIR).split(os.sep)
         for i in range(len(dirlist)):
@@ -148,6 +150,17 @@ class mdownloader:
         with open(self.args['logfile'], "a") as file:
             file.write("".join(self.DF_links['id'].values))
 
+    def mark_as_undone(self):
+        if os.path.isfile(self.args['logfile']):
+            with open(self.args['logfile'], "r") as log_file:
+                log_ids = log_file.read()
+
+            for link_id in self.DF_links['id'].values:
+                log_ids = log_ids.replace(link_id, '')
+
+            with open(self.args['logfile'], "w") as log_file:
+                log_file.write(log_ids)
+
     def check_free_space(self):
         """
         return free disk space in GB
@@ -184,7 +197,8 @@ def main(headless=True):
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")
     parser.add_argument("--run", help="run downloads", action="store_true")
     parser.add_argument("--title", help="Cut unneccessary parts from title", action="store_true")
-    parser.add_argument("--skip", help="Mark found IDs as done.", action="store_true")
+    parser.add_argument("--mark-done", help="Mark found IDs as done.", action="store_true")
+    parser.add_argument("--mark-undone", help="Mark found IDs as undone.", action="store_true")
 
     args = parser.parse_args()
   
