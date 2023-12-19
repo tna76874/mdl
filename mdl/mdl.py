@@ -97,7 +97,8 @@ class mdownloader:
             DF_links['id'] = DF_links['id'] + '\n'
             
             # exclude all processed sources
-            DF_links = DF_links[~DF_links['id'].isin(self.processed)]
+            if not self.args['mark_undone']:
+                DF_links = DF_links[~DF_links['id'].isin(self.processed)]
             
             # cleanup titles
             DF_links['title'] = DF_links['title'].str.replace("/",' ')  
