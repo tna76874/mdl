@@ -7,9 +7,11 @@ import argparse
 import pandas as pd
 import os
 import requests
+from bs4 import BeautifulSoup
 import subprocess
 import datetime
 import re
+from slugify import slugify
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -53,6 +55,8 @@ class mdownloader:
         if self.args['mark_undone']: self.mark_as_undone()
           
         if self.args['run']: self.download_movies()
+
+        if self.args['series']: self.series_downloader()
         
     
     def get_links(self):
@@ -90,7 +94,7 @@ class mdownloader:
             DF_links = DF_links[['id','title','link','duration','timestamp','size']]
             
             #exclude useless sources
-            for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)'])):
+            for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)', '(Französisch)', '(dan)'])):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
             
             # formatting id columns
@@ -127,7 +131,7 @@ class mdownloader:
         """
         if self.args['file']:
             self.ensure_dir(self.args['download'])
-            FILENAME=os.path.join(self.args['download'],re.sub(r'[\\/*?:"<>|& ]',"_",TITLE+'.mp4'))
+            FILENAME=os.path.join(self.args['download'],slugify(TITLE+'.mp4', separator='_'))
             result = subprocess.run(["wget", "-c" ,"-O", FILENAME, URL],
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
@@ -166,6 +170,7 @@ class mdownloader:
         """
         return free disk space in GB
         """
+        self.ensure_dir(self.args['download'])
         disk = os.statvfs(self.args['download']+'/')
         return float(disk.f_bsize*disk.f_bfree)/1024/1024/1024
 
@@ -182,6 +187,27 @@ class mdownloader:
                         file.write(self.DF_links.loc[i,'id'])
             else:
                 print("No free disk space. Skip download.")
+                
+    def series_downloader(self):
+        url = "https://www.zdf.de/serien"
+        response = requests.get(url)
+        
+        download_base_dir = self.args['download']
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        serien = soup.find_all('h3', class_='teaser-title has-logo')
+        
+        serien = list(set([ serie.text.strip() for serie in serien ]))
+        
+        self.args['title']=True
+        self.args['file']=True
+        for serie_name in serien:
+            serie_name_folder = slugify(serie_name, lowercase=False, separator=' ', replacements=[["'",""]], allow_unicode=True)
+            self.args['download'] = os.path.join(download_base_dir, serie_name_folder)
+            self.args['search'] = serie_name
+            self.get_info()
+            self.download_movies()
 
 
 def main(headless=True):
@@ -200,6 +226,8 @@ def main(headless=True):
     parser.add_argument("--title", help="Cut unneccessary parts from title", action="store_true")
     parser.add_argument("--mark-done", help="Mark found IDs as done.", action="store_true")
     parser.add_argument("--mark-undone", help="Mark found IDs as undone.", action="store_true")
+    parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of top-series.", action="store_true")
+
 
     args = parser.parse_args()
   

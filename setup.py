@@ -18,6 +18,8 @@ setup(
         "pandas",
         "argparse",
         "requests",
+        "python-slugify",
+        "beautifulsoup4",
     ],
     classifiers=[
         'Development Status :: 1 - Planning',
