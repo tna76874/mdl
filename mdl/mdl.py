@@ -23,7 +23,7 @@ class mdownloader:
         self.args = {
                     'free' : float(20),
                     'quality' : 'H',
-                    'series_filter' : '',
+                    'series_filter' : 'Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -193,9 +193,6 @@ class mdownloader:
     def series_downloader(self):
         url = "https://www.zdf.de/serien"
         response = requests.get(url)
-        
-        if self.args['series_filter'] == '':
-            self.args['series_filter'] = ['Top-Serien zum Streamen', 'Drama-Serien', 'Thriller-Serien', 'Comedy-Serien', 'Internationale Serien', 'neoriginal', 'Beliebte Serien', 'Krimi-Serien']
         
         download_base_dir = self.args['download']
         
