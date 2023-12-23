@@ -23,7 +23,7 @@ class mdownloader:
         self.args = {
                     'free' : float(20),
                     'quality' : 'H',
-                    'series_filter' : 'Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',
+                    'series_filter' : '',
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -253,7 +253,7 @@ def main(headless=True):
     parser.add_argument("--mark-done", help="Mark found IDs as done.", action="store_true")
     parser.add_argument("--mark-undone", help="Mark found IDs as undone.", action="store_true")
     parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of series.", action="store_true")
-    parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default="",type=str)
+    parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
 
 
 
