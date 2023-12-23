@@ -48,13 +48,13 @@ class mdownloader:
         else:
             self.processed=[]
            
-        if self.args['search'] != None: self.get_info()
+        if (self.args['search'] != None) & (not self.args['series']): self.get_info()
         
         if self.args['mark_done']: self.mark_as_done()
 
         if self.args['mark_undone']: self.mark_as_undone()
           
-        if self.args['run']: self.download_movies()
+        if self.args['run'] & (not self.args['series']): self.download_movies()
 
         if self.args['series']: self.series_downloader()
         
@@ -200,16 +200,19 @@ class mdownloader:
         
         serien = list(set([ serie.text.strip() for serie in serien ]))
         serien.sort()
+        print(pd.DataFrame({'title': serien}))
         
         self.args['title']=True
         self.args['file']=True
         self.args['channel']='ZDF'
-        for serie_name in serien:
-            serie_name_folder = slugify(serie_name, lowercase=False, separator=' ', replacements=[["'",""]], allow_unicode=True)
-            self.args['download'] = os.path.join(download_base_dir, serie_name_folder)
-            self.args['search'] = serie_name
-            self.get_info()
-            self.download_movies()
+
+        if self.args['run']:
+            for serie_name in serien:
+                serie_name_folder = slugify(serie_name, lowercase=False, separator=' ', replacements=[["'",""]], allow_unicode=True)
+                self.args['download'] = os.path.join(download_base_dir, serie_name_folder)
+                self.args['search'] = serie_name
+                self.get_info()
+                self.download_movies()
 
 
 def main(headless=True):
