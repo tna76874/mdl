@@ -131,7 +131,7 @@ class mdownloader:
         """
         if self.args['file']:
             self.ensure_dir(self.args['download'])
-            FILENAME=os.path.join(self.args['download'],slugify(TITLE, separator='_')+'.mp4')
+            FILENAME=os.path.join(self.args['download'],slugify(TITLE, separator='_', lowercase=False)+'.mp4')
             result = subprocess.run(["wget", "-c" ,"-O", FILENAME, URL],
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
