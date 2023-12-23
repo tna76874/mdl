@@ -199,6 +199,7 @@ class mdownloader:
         serien = soup.find_all('h3', class_='teaser-title has-logo')
         
         serien = list(set([ serie.text.strip() for serie in serien ]))
+        serien.sort()
         
         self.args['title']=True
         self.args['file']=True
