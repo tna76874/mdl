@@ -12,10 +12,6 @@ import subprocess
 import datetime
 import re
 from slugify import slugify
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
