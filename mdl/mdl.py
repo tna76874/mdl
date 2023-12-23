@@ -12,6 +12,10 @@ import subprocess
 import datetime
 import re
 from slugify import slugify
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -23,8 +27,10 @@ class mdownloader:
         self.args = {
                     'free' : float(20),
                     'quality' : 'H',
+                    'series_filter' : '',
                     }
         self.args.update(kwargs)
+        self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
         
         self.quality =  {
                         'H' : 'url_video_hd',
@@ -192,14 +198,36 @@ class mdownloader:
         url = "https://www.zdf.de/serien"
         response = requests.get(url)
         
+        if self.args['series_filter'] == '':
+            self.args['series_filter'] = ['Top-Serien zum Streamen', 'Drama-Serien', 'Thriller-Serien', 'Comedy-Serien', 'Internationale Serien', 'neoriginal', 'Beliebte Serien', 'Krimi-Serien']
+        
         download_base_dir = self.args['download']
         
         soup = BeautifulSoup(response.text, 'html.parser')
+                
+        b_cluster_posters = soup.find_all('article', class_='b-cluster-poster')
+        b_clusters = soup.find_all('article', class_='b-cluster')
         
-        serien = soup.find_all('h3', class_='teaser-title has-logo')
+        combined_sections = b_cluster_posters + b_clusters
         
-        serien = list(set([ serie.text.strip() for serie in serien ]))
+        series = dict()
+        
+        # Iteriere über alle Abschnitte in der kombinierten Liste
+        for section in combined_sections:
+            # Dein Code, um Informationen aus den Abschnitten zu extrahieren
+            h2_element = section.find('h2', class_='cluster-title')
+            # Weitere Extraktionen oder Aktionen...
+            if h2_element:
+                h2_title = h2_element.text.strip()
+                serieslist = list()
+                a_elements = section.find_all('a', class_='teaser-title-link')
+                for a_element in a_elements:
+                    serieslist.append(a_element.get('title'))
+                series[h2_title] = serieslist
+        
+        serien = list(set([value.strip() for key in self.args['series_filter'] if key in series for value in series[key]]))
         serien.sort()
+
         print(pd.DataFrame({'title': serien}))
         
         self.args['title']=True
@@ -231,7 +259,9 @@ def main(headless=True):
     parser.add_argument("--title", help="Cut unneccessary parts from title", action="store_true")
     parser.add_argument("--mark-done", help="Mark found IDs as done.", action="store_true")
     parser.add_argument("--mark-undone", help="Mark found IDs as undone.", action="store_true")
-    parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of top-series.", action="store_true")
+    parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of series.", action="store_true")
+    parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default="",type=str)
+
 
 
     args = parser.parse_args()
