@@ -131,7 +131,7 @@ class mdownloader:
         """
         if self.args['file']:
             self.ensure_dir(self.args['download'])
-            FILENAME=os.path.join(self.args['download'],slugify(TITLE+'.mp4', separator='_'))
+            FILENAME=os.path.join(self.args['download'],slugify(TITLE, separator='_')+'.mp4')
             result = subprocess.run(["wget", "-c" ,"-O", FILENAME, URL],
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
@@ -202,6 +202,7 @@ class mdownloader:
         
         self.args['title']=True
         self.args['file']=True
+        self.args['channel']='ZDF'
         for serie_name in serien:
             serie_name_folder = slugify(serie_name, lowercase=False, separator=' ', replacements=[["'",""]], allow_unicode=True)
             self.args['download'] = os.path.join(download_base_dir, serie_name_folder)
