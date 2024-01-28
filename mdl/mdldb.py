@@ -6,7 +6,7 @@
 import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, joinedload
 from datetime import datetime, timedelta, timezone
 local_timezone = timezone(timedelta(hours=1))
 
@@ -83,6 +83,46 @@ class DataBaseManager:
             except Exception as e:
                 print(f"Error saving sources: {e}")
                 session.rollback()
+
+    def get_source_on_id(self, list_of_id, quality='M'):
+        quality_column =    {
+                            'H' : 'url_video_hd',
+                            'M' : 'url_video',
+                            'L' : 'url_video_low',
+                            }
+        with self.Session() as session:
+            sources = (
+                session.query(Source)
+                .filter(Source.id.in_(list_of_id))
+                .all()
+            )
+
+            result = []
+
+            for source in sources:
+                # Verwende die getattr-Methode, um die richtige Spalte basierend auf der Qualität zu erhalten
+                link_column = quality_column.get(quality, None)
+
+                if link_column:
+                    link = getattr(source, link_column, None)
+                else:
+                    link = getattr(source, quality_column.get('M'), None)
+
+                # Größe in Megabytes umrechnen
+                size_mb = source.size / (1024 * 1024)
+
+                data = {
+                    'id': source.id,
+                    'title': source.title,
+                    'link': link,
+                    'duration': source.duration,
+                    'timestamp': source.timestamp,
+                    'size': size_mb,
+                }
+
+                result.append(data)
+
+            return result
         
 if __name__ == "__main__":
     example_data = [{
@@ -103,5 +143,7 @@ if __name__ == "__main__":
     }]
 
     
-    with DataBaseManager() as db_manager:
-        db_manager.save_sources(example_data)
+    # with DataBaseManager() as db_manager:
+    #     db_manager.save_sources(example_data)
+    self = DataBaseManager()
+    links = self.get_source_on_id(['LTPjRo6nFmdz9Bm7AjnyA7nlkb6fbWdZpJp17NlhK5Y='])

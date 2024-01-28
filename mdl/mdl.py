@@ -88,29 +88,16 @@ class mdownloader:
             skip+=50
             if len(DF_tmp)==0: break
         
-        with DataBaseManager() as db_manager:
-            db_manager.save_sources(DF_links.to_dict(orient='records'))
+        db_manager = DataBaseManager()
+        db_manager.save_sources(DF_links.to_dict(orient='records'))
+            
+        DF_links = pd.DataFrame(db_manager.get_source_on_id(DF_links['id'].values))
         
-        if not DF_links.empty:
-            # Converting size in MB
-            DF_links['size'] = DF_links['size'] / (1024*1024)
-            
-            # Converting timestamps
-            DF_links['timestamp'] = DF_links['timestamp'].apply(lambda x: pd.to_datetime(datetime.datetime.utcfromtimestamp(int(x))))
-            
-            # renaming columns
-            DF_links.rename(columns={self.quality[self.args['quality']]: 'link'}, inplace=True)
-            
-            # dropping useles columns
-            DF_links = DF_links[['id','title','link','duration','timestamp','size']]
-            
+        if not DF_links.empty:           
             #exclude useless sources
             for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)', '(Französisch)', '(dan)'])):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
-            
-            # formatting id columns
-            DF_links['id'] = DF_links['id'] + '\n'
-            
+                       
             # exclude all processed sources
             if not self.args['mark_undone']:
                 DF_links = DF_links[~DF_links['id'].isin(self.processed)]
