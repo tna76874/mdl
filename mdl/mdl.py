@@ -119,10 +119,13 @@ class mdownloader:
             if len(DF_tmp)==0: break
         
         self.db.save_sources(DF_links.to_dict(orient='records'))
-                
-        if not DF_links.empty:   
+        
+        try:
             DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=self.args['q']==False, quality=self.args['quality']))
-            
+        except:
+            DF_links = pd.DataFrame()
+
+        if not DF_links.empty:              
             #exclude useless sources
             for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)', '(Französisch)', '(dan)'])):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
