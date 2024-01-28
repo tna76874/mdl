@@ -13,6 +13,12 @@ import datetime
 import re
 from slugify import slugify
 
+try:
+    from mdl.mdldb import DataBaseManager
+except:
+    from mdldb import DataBaseManager
+    
+
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -81,7 +87,10 @@ class mdownloader:
             DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
             skip+=50
             if len(DF_tmp)==0: break
-
+        
+        with DataBaseManager() as db_manager:
+            db_manager.save_sources(DF_links.to_dict(orient='records'))
+        
         if not DF_links.empty:
             # Converting size in MB
             DF_links['size'] = DF_links['size'] / (1024*1024)
@@ -264,4 +273,5 @@ def main(headless=True):
     else: return mdownloader(**vars(args))
 
 if __name__ == "__main__":   
-    self = main(headless=False)
+    pass
+    # self = main(headless=False)
