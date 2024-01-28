@@ -35,7 +35,6 @@ class Downloaded(Base):
     did = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime, default=lambda: datetime.now(local_timezone))
     source_id = Column(String, ForeignKey('source.id'))
-    ignore = Column(Boolean, default=False)
     
 class DataBaseManager:
     def __init__(self, configdir = "~/.config/mdl"):
@@ -84,18 +83,28 @@ class DataBaseManager:
                 print(f"Error saving sources: {e}")
                 session.rollback()
 
-    def get_source_on_id(self, list_of_id, quality='M'):
-        quality_column =    {
-                            'H' : 'url_video_hd',
-                            'M' : 'url_video',
-                            'L' : 'url_video_low',
-                            }
+    def get_source_on_id(self, list_of_id, quality='M', only_not_downloaded=True):
+        quality_column = {
+            'H': 'url_video_hd',
+            'M': 'url_video',
+            'L': 'url_video_low',
+        }
+
         with self.Session() as session:
-            sources = (
+            # Basisabfrage für Quellen
+            query = (
                 session.query(Source)
                 .filter(Source.id.in_(list_of_id))
-                .all()
             )
+    
+            if only_not_downloaded:
+                subquery = (
+                    session.query(Downloaded.source_id)
+                    .filter(Downloaded.source_id.in_(list_of_id))
+                )
+                query = query.filter(~Source.id.in_(subquery))
+    
+            sources = query.all()
 
             result = []
 
@@ -123,6 +132,40 @@ class DataBaseManager:
                 result.append(data)
 
             return result
+
+    def mark_as_downloaded(self, list_of_id):
+        with self.Session() as session:
+            try:
+                for item_id in list_of_id:
+                    downloaded_item = Downloaded(source_id=item_id)
+                    session.add(downloaded_item)
+
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+
+    def mark_as_not_downloaded(self, list_of_id):
+        with self.Session() as session:
+            try:
+                for item_id in list_of_id:
+                    downloaded_item = session.query(Downloaded).filter_by(source_id=item_id).first()
+                    if downloaded_item:
+                        session.delete(downloaded_item)
+    
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                
+    def is_downloaded(self, item_id):
+        with self.Session() as session:
+            downloaded_item = (
+                session.query(Downloaded)
+                .filter_by(source_id=item_id)
+                .first()
+            )
+
+            return downloaded_item is not None
+
         
 if __name__ == "__main__":
     example_data = [{
@@ -146,4 +189,4 @@ if __name__ == "__main__":
     # with DataBaseManager() as db_manager:
     #     db_manager.save_sources(example_data)
     self = DataBaseManager()
-    links = self.get_source_on_id(['LTPjRo6nFmdz9Bm7AjnyA7nlkb6fbWdZpJp17NlhK5Y='])
+    links = self.get_source_on_id(['LiJHLZQLdDfU9V6QKWEI0zLb41nM61v0CTd6TxQ8PzM='])

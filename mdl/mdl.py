@@ -50,11 +50,16 @@ class mdownloader:
         
         self.DF_links = pd.DataFrame()
         
+        self.db = DataBaseManager(configdir=self.args['configdir'])
+        
         if os.path.exists(self.args['logfile']) & ~self.args['q']:
             with open(self.args['logfile']) as f:
-                self.processed = f.readlines()
-        else:
-            self.processed=[]
+                processed = [line.strip() for line in f.readlines()]
+                
+            self.db.mark_as_downloaded(processed)
+                
+            os.remove(self.args['logfile'])
+
            
         if (self.args['search'] != None) & (not self.args['series']): self.get_info()
         
@@ -66,6 +71,8 @@ class mdownloader:
 
         if self.args['series']: self.series_downloader()
         
+    def processed(self, itemid):
+        return self.db.is_downloaded(itemid)
     
     def get_links(self):
         QUERIES = [{'fields': ['title', 'topic'],'query': k} for k in self.args['search'].split(',')]
@@ -88,25 +95,20 @@ class mdownloader:
             skip+=50
             if len(DF_tmp)==0: break
         
-        db_manager = DataBaseManager()
-        db_manager.save_sources(DF_links.to_dict(orient='records'))
+        self.db.save_sources(DF_links.to_dict(orient='records'))
             
-        DF_links = pd.DataFrame(db_manager.get_source_on_id(DF_links['id'].values))
+        DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=self.args['q']==False))
         
         if not DF_links.empty:           
             #exclude useless sources
             for i in list(set(self.args['exclude'].split(',')) | set(['Audiodeskription', '(ita)', '(Englisch)', '(Französisch)', '(dan)'])):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
-                       
-            # exclude all processed sources
-            if not self.args['mark_undone']:
-                DF_links = DF_links[~DF_links['id'].isin(self.processed)]
             
             # cleanup titles
             DF_links['title'] = DF_links['title'].str.replace("/",' ')  
             
             # dropping prewiew sources
-            DF_links = DF_links[DF_links['duration'].astype(int)>(self.args['min_duration']*60)].reset_index(drop=True)
+            DF_links = DF_links[DF_links['duration']>datetime.timedelta(minutes=self.args['min_duration'])].reset_index(drop=True)
             
             # sort after publish date
             DF_links.sort_values('timestamp',inplace=True)
@@ -149,20 +151,10 @@ class mdownloader:
             print("No sources found!")
 
     def mark_as_done(self):
-        self.ensure_dir(self.args['configdir'])
-        with open(self.args['logfile'], "a") as file:
-            file.write("".join(self.DF_links['id'].values))
+        self.db.mark_as_downloaded(self.DF_links['id'].values)
 
     def mark_as_undone(self):
-        if os.path.isfile(self.args['logfile']):
-            with open(self.args['logfile'], "r") as log_file:
-                log_ids = log_file.read()
-
-            for link_id in self.DF_links['id'].values:
-                log_ids = log_ids.replace(link_id, '')
-
-            with open(self.args['logfile'], "w") as log_file:
-                log_file.write(log_ids)
+        self.db.mark_as_not_downloaded(self.DF_links['id'].values)
 
     def check_free_space(self):
         """
@@ -180,9 +172,7 @@ class mdownloader:
                 self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
 
                 if not self.args['q']:
-                    self.ensure_dir(self.args['configdir'])
-                    with open(self.args['logfile'], "a") as file:
-                        file.write(self.DF_links.loc[i,'id'])
+                    self.db.mark_as_downloaded([self.DF_links.loc[i,'id']])
             else:
                 print("No free disk space. Skip download.")
                 
@@ -260,5 +250,4 @@ def main(headless=True):
     else: return mdownloader(**vars(args))
 
 if __name__ == "__main__":   
-    pass
-    # self = main(headless=False)
+    self = main(headless=False)

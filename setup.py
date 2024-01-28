@@ -20,6 +20,7 @@ setup(
         "requests",
         "python-slugify",
         "beautifulsoup4",
+        "SQLAlchemy",
     ],
     classifiers=[
         'Development Status :: 1 - Planning',
