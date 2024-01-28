@@ -33,13 +33,7 @@ class mdownloader:
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
-        
-        self.quality =  {
-                        'H' : 'url_video_hd',
-                        'M' : 'url_video',
-                        'L' : 'url_video_low',
-                        }
-        
+
         if self.args['q']: self.args['download'] = os.getcwd()
         
         for i in ['configdir', 'download']:
@@ -97,7 +91,7 @@ class mdownloader:
         
         self.db.save_sources(DF_links.to_dict(orient='records'))
             
-        DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=self.args['q']==False))
+        DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=self.args['q']==False, quality=self.args['quality']))
         
         if not DF_links.empty:           
             #exclude useless sources
