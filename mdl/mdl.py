@@ -68,6 +68,35 @@ class mdownloader:
     def processed(self, itemid):
         return self.db.is_downloaded(itemid)
     
+    def get_series_metadata_from_id(self, id_list):
+        DF_links = pd.DataFrame(self.db.get_source_on_id(id_list, only_not_downloaded=False, website=True))
+        for _, row in DF_links.iterrows():
+            # URL der Webseite, die geparst werden soll
+            url = row['website']
+            
+            if url.startswith("https://www.zdf.de/serien"):
+                # HTML-Code von der URL abrufen
+                response = requests.get(url)
+                html_code = response.text
+                
+                try:
+                    # BeautifulSoup-Objekt erstellen
+                    soup = BeautifulSoup(html_code, 'html.parser')
+                    
+                    # Text aus dem span-Tag extrahieren und aufteilen
+                    teaser_text = soup.find('span', class_='teaser-cat').get_text(strip=True)
+                    
+                    # Verwenden von regulären Ausdrücken, um nach dem Muster "Staffel X, Folge Y" zu suchen
+                    match = re.search(r'Staffel (\d+),\s*Folge (\d+)', teaser_text)
+            
+                    if match:
+                        season = int(match.group(1))
+                        episode = int(match.group(2))
+    
+                        self.db.add_metadata([{'source_id': row['id'], 'season': season, 'episode': episode}])
+                except:
+                    pass
+    
     def get_links(self):
         QUERIES = [{'fields': ['title', 'topic'],'query': k} for k in self.args['search'].split(',')]
         if self.args['channel'].split(',') != ['']: QUERIES += [{'fields': ['channel'],'query': k} for k in self.args['channel'].split(',')]
@@ -119,23 +148,6 @@ class mdownloader:
                 os.mkdir(tmpdir)
                 print('Create {:}'.format(tmpdir))
     
-    def wget(self,URL,TITLE):
-        """
-        download URL
-        """
-        if self.args['file']:
-            self.ensure_dir(self.args['download'])
-            FILENAME=os.path.join(self.args['download'],slugify(TITLE, separator='_', lowercase=False)+'.mp4')
-            result = subprocess.run(["wget", "-c" ,"-O", FILENAME, URL],
-                     stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT)
-        else:
-            DIR=os.path.join(self.args['download'],TITLE)
-            self.ensure_dir(DIR)
-            result = subprocess.run(["wget", "-c" ,"-P", DIR, URL],
-                     stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT)
-
     def get_info(self):
         self.get_links()
         if not self.DF_links.empty:
@@ -158,12 +170,37 @@ class mdownloader:
         disk = os.statvfs(self.args['download']+'/')
         return float(disk.f_bsize*disk.f_bfree)/1024/1024/1024
 
+    def wget(self,URL,TITLE):
+        """
+        download URL
+        """
+        if self.args['file']:
+            FILENAME=os.path.join(self.args['download'], TITLE)
+            self.ensure_dir(os.path.dirname(FILENAME))
+            CMD=["wget", "-c" ,"-O", FILENAME, URL]
+            result = subprocess.run(CMD,
+                     stdout=subprocess.PIPE,
+                     stderr=subprocess.STDOUT)
+        else:
+            DIR=os.path.join(self.args['download'], TITLE)
+            self.ensure_dir(DIR)
+            CMD = ["wget", "-c" ,"-P", DIR, URL]
+            result = subprocess.run(CMD,
+                     stdout=subprocess.PIPE,
+                     stderr=subprocess.STDOUT)
+
     def download_movies(self):
-        for i in self.DF_links.index:
-            print("Start downloading: {:}".format(self.DF_links.loc[i,'title']))
+        for i, row in self.DF_links.iterrows():
+            self.get_series_metadata_from_id([row['id']])
+            meta = self.db.get_metadata(row['id'])
+            
+            TITLE = slugify(row['title'], separator='_', lowercase=False)+'.mp4'
+            if meta:
+                TITLE = os.path.join(f'Staffel {meta["season"]:d}',f'S{meta["season"]:02d}E{meta["episode"]:02d}_{TITLE}')
 
             if (self.check_free_space() - self.DF_links.loc[i,'size'] / 1024) > float(self.args['free']):
-                self.wget(self.DF_links.loc[i,'link'],self.DF_links.loc[i,'title'])
+                print(f"Start downloading: {TITLE}")
+                self.wget(self.DF_links.loc[i,'link'], TITLE)
 
                 if not self.args['q']:
                     self.db.mark_as_downloaded([self.DF_links.loc[i,'id']])
