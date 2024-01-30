@@ -163,7 +163,7 @@ class mdownloader:
     def get_info(self):
         self.get_links()
         if not self.DF_links.empty:
-            print(self.DF_links[['title']])
+            print(self.DF_links[['title', 'channel']])
             print("Download {:d} movies ({:.1f}GB)".format(len(self.DF_links),float(self.DF_links['size'].sum()/1024)))
         else:
             print("No sources found!")

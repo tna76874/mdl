@@ -177,6 +177,7 @@ class DataBaseManager:
                     'duration': source.duration,
                     'timestamp': source.timestamp,
                     'size': size_mb,
+                    'channel' : source.channel,
                 }
                 if website:
                     data['website'] = source.url_website
