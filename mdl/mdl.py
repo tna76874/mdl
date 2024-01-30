@@ -178,7 +178,7 @@ class mdownloader:
         download URL
         """
         if self.args['file']:
-            FILENAME=os.path.join(self.args['download'], TITLE)
+            FILENAME=os.path.join(self.args['download'], TITLE+'.mp4')
             self.ensure_dir(os.path.dirname(FILENAME))
             CMD=["wget", "-c" ,"-O", FILENAME, URL]
             result = subprocess.run(CMD,
@@ -197,7 +197,7 @@ class mdownloader:
             self.get_series_metadata_from_id([row['id']])
             meta = self.db.get_metadata(row['id'])
             
-            TITLE = slugify(row['title'], separator='_', lowercase=False)+'.mp4'
+            TITLE = slugify(row['title'], separator='_', lowercase=False)
             if meta:
                 TITLE = os.path.join(f'Staffel {meta["season"]:d}',f'S{meta["season"]:02d}E{meta["episode"]:02d}_{TITLE}')
 
