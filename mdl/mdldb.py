@@ -168,7 +168,10 @@ class DataBaseManager:
                     link = getattr(source, quality_column.get('M'), None)
 
                 # Größe in Megabytes umrechnen
-                size_mb = source.size / (1024 * 1024)
+                try:
+                    size_mb = source.size / (1024 * 1024)
+                except:
+                    size_mb = 0
 
                 data = {
                     'id': source.id,
