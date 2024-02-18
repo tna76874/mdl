@@ -126,7 +126,7 @@ class mdownloader:
         self.db.save_sources(DF_links.to_dict(orient='records'))
         
         try:
-            DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=(self.args['q']==False) or self.args['mark_undone'], quality=self.args['quality']))
+            DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=(self.args['q']==False) and (not self.args['mark_undone']), quality=self.args['quality']))
         except:
             DF_links = pd.DataFrame()
 
