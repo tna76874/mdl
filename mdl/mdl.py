@@ -37,7 +37,7 @@ class mdownloader:
                     'download': os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),
                     'search': 'spielfilm-highlights',
                     'series': False,
-                    'channel': '',
+                    'channel': 'ZDF',
                     'mark_undone': False,
                     'mark_done': False,
                     'exclude': 'Audiodeskription,(ita),(swe)',
