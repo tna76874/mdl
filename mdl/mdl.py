@@ -6,12 +6,14 @@ DOWNLOAD ALL THE MOVIES
 import argparse
 import pandas as pd
 import os
+import shutil
 import requests
 from bs4 import BeautifulSoup
 import subprocess
 import datetime
 import re
 from slugify import slugify
+from urllib.parse import urlparse
 
 try:
     from mdl.mdldb import DataBaseManager
@@ -121,7 +123,7 @@ class mdownloader:
         self.db.save_sources(DF_links.to_dict(orient='records'))
         
         try:
-            DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=self.args['q']==False, quality=self.args['quality']))
+            DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=(self.args['q']==False) or self.args['mark_undone'], quality=self.args['quality']))
         except:
             DF_links = pd.DataFrame()
 
@@ -151,6 +153,14 @@ class mdownloader:
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
+            
+    def _get_download_filename_from_url(self, URL):
+            parsed_url = urlparse(URL)
+            path_components = parsed_url.path.split('/')
+            try:
+                return path_components[-1] if path_components[-1] else None
+            except:
+                return None
 
     def ensure_dir(self,DIR):
         dirlist = os.path.normpath(DIR).split(os.sep)
@@ -181,6 +191,18 @@ class mdownloader:
         self.ensure_dir(self.args['download'])
         disk = os.statvfs(self.args['download']+'/')
         return float(disk.f_bsize*disk.f_bfree)/1024/1024/1024
+    
+    def _wget(self, FILENAME, URL):
+        try:
+            CMD=["wget", "-c" ,"-O", FILENAME, URL]
+            print(f"Start downloading: {FILENAME}")
+            result = subprocess.run(CMD,
+                     stdout=subprocess.PIPE,
+                     stderr=subprocess.STDOUT)
+            
+            return result.returncode==0
+        except:
+            return False
 
     def wget(self,row,TITLE):
         """
@@ -188,21 +210,37 @@ class mdownloader:
         """
         URL = row['link']
         if self.args['file']:
-            FILENAME=os.path.join(self.args['download'], TITLE+'.mp4')
-            self.ensure_dir(os.path.dirname(FILENAME))
-            CMD=["wget", "-c" ,"-O", FILENAME, URL]
-            print(f"Start downloading: {FILENAME}")
-            result = subprocess.run(CMD,
-                     stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT)
+            DOWNLOAD_FILENAME = f'{TITLE}.mp4'
+            DOWNLOAD_BASEDIR = self.args['download']
         else:
-            DIR=os.path.join(self.args['download'], row['title'])
-            self.ensure_dir(DIR)
-            print(f"Start downloading: {DIR}")
-            CMD = ["wget", "-c" ,"-P", DIR, URL]
-            result = subprocess.run(CMD,
-                     stdout=subprocess.PIPE,
-                     stderr=subprocess.STDOUT)
+            URL_FILENAME = self._get_download_filename_from_url(URL)
+            DOWNLOAD_BASEDIR = os.path.join(self.args['download'], row['title'])
+            if URL_FILENAME:
+                DOWNLOAD_FILENAME = URL_FILENAME
+            else:
+                DOWNLOAD_FILENAME = f'{TITLE}.mp4'
+        
+        # setting paths
+        DOWNLOAD_PATH_FILENAME = os.path.join(DOWNLOAD_BASEDIR, DOWNLOAD_FILENAME)
+        PARTIAL_FILENAME = f'{DOWNLOAD_PATH_FILENAME}.partial'
+        
+        # ensure directory exists
+        self.ensure_dir(os.path.dirname(DOWNLOAD_PATH_FILENAME))
+        
+        # try downloading file
+        max_attempts, attempt, success = 3, 0, False
+        while attempt < max_attempts and not success:
+            success = self._wget(PARTIAL_FILENAME, URL)
+            attempt += 1
+            
+        # cleanup
+        if os.path.exists(PARTIAL_FILENAME):
+            if success:
+                shutil.move(PARTIAL_FILENAME, DOWNLOAD_PATH_FILENAME)
+            else:
+                os.remove(PARTIAL_FILENAME)
+                
+        return success
 
     def download_movies(self):
         for i, row in self.DF_links.iterrows():
@@ -214,9 +252,9 @@ class mdownloader:
                 TITLE = os.path.join(f'Staffel {meta["season"]:d}',f'S{meta["season"]:02d}E{meta["episode"]:02d}_{TITLE}')
 
             if (self.check_free_space() - self.DF_links.loc[i,'size'] / 1024) > float(self.args['free']):
-                self.wget(row, TITLE)
+                is_downloaded = self.wget(row, TITLE)
 
-                if not self.args['q']:
+                if not self.args['q'] and is_downloaded:
                     self.db.mark_as_downloaded([self.DF_links.loc[i,'id']])
             else:
                 print("No free disk space. Skip download.")
@@ -256,7 +294,9 @@ class mdownloader:
         
         self.args['title']=True
         self.args['file']=True
-        self.args['channel']='ZDF'
+        
+        if self.args['channel']=='':
+            self.args['channel']='ZDF'
 
         if self.args['run']:
             for serie_name in serien:
