@@ -115,10 +115,13 @@ class mdownloader:
                         'duration_min': 20,
                         'duration_max': 10000,
                         }
-            DF_tmp = pd.DataFrame(requests.post('https://mediathekviewweb.de/api/query',  json=data, headers={'content-type': 'text/plain'}).json()['result']['results'])
-            DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
-            skip+=50
-            if len(DF_tmp)==0: break
+            try:
+                DF_tmp = pd.DataFrame(requests.post('https://mediathekviewweb.de/api/query',  json=data, headers={'content-type': 'text/plain'}).json()['result']['results'])
+                DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
+                skip+=50
+                if len(DF_tmp)==0: break
+            except:
+                break
         
         self.db.save_sources(DF_links.to_dict(orient='records'))
         
@@ -194,7 +197,7 @@ class mdownloader:
     
     def _wget(self, FILENAME, URL):
         try:
-            CMD=["wget", "-c" ,"-O", FILENAME, URL]
+            CMD=["wget", "--timeout=3" ,"-c" ,"-O", FILENAME, URL]
             print(f"Start downloading: {FILENAME}")
             result = subprocess.run(CMD,
                      stdout=subprocess.PIPE,

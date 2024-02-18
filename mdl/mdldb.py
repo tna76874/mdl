@@ -3,7 +3,7 @@
 """
 """
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, joinedload
 from datetime import datetime, timedelta, timezone
@@ -12,7 +12,7 @@ local_timezone = timezone(timedelta(hours=1))
 
 Base = declarative_base()
 
-class Metadata(Base):
+class Meta(Base):
     __tablename__ = 'metadata'
     id = Column(Integer, primary_key=True, autoincrement=True)
     source_id = Column(String, ForeignKey('source.id'), unique=True)
@@ -36,6 +36,7 @@ class Source(Base):
     url_video_low = Column(String)
     url_video_hd = Column(String)
     filmlisteTimestamp = Column(DateTime)
+    fileformat = Column(String)
 
 class Downloaded(Base):
     __tablename__ = 'downloaded'
@@ -49,16 +50,89 @@ class DataBaseManager:
         os.makedirs(config_folder, exist_ok=True)
 
         db_path = os.path.join(config_folder, "data.db")
-        engine = create_engine(f"sqlite:///{db_path}")
-        Base.metadata.create_all(engine)
+        self.engine = create_engine(f"sqlite:///{db_path}")
+        
+        self.ensure_all_tables()
 
-        self.Session = sessionmaker(bind=engine)
+        self.Session = sessionmaker(bind=self.engine)
+        
+        self.update_fileformat_from_url_video()
+
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+    
+    def update_fileformat_from_url_video(self):
+        """
+        Aktualisiert das 'fileformat'-Attribut für alle Zeilen, in denen 'fileformat' NULL ist,
+        indem der Wert aus 'url_video' ausgelesen wird.
+        """
+        with self.Session() as session:
+            try:
+                # Alle Zeilen auswählen, in denen 'fileformat' NULL ist
+                null_fileformat_entries = session.query(Source).filter(Source.fileformat.is_(None)).all()
+
+                # Durch jede Zeile iterieren und 'fileformat' aktualisieren
+                for entry in null_fileformat_entries:
+                    # 'fileformat' aus 'url_video' auslesen
+                    try:
+                        fileformat = entry.url_video.split('.')[-1].lower()
+                    except:
+                        continue
+
+                    entry.fileformat = fileformat
+                        
+                # Änderungen in die Datenbank schreiben
+                session.commit()
+
+            except Exception as e:
+                print(f"Error updating fileformat from url_video: {e}")
+                session.rollback()
+    
+    def ensure_all_tables(self):
+        Base.metadata.create_all(self.engine)
+        
+        # Create a MetaData object
+        metadata = MetaData()
+    
+        # Bind the MetaData object with the existing database engine
+        metadata.reflect(bind=self.engine)
+    
+        # Iterate over all tables in the Base.metadata
+        for table_name, table in Base.metadata.tables.items():
+            # Get the existing table from the reflected metadata
+            existing_table = metadata.tables.get(table_name)
+    
+            # Check if the table does not exist in the database
+            if existing_table is None:
+                # If the table does not exist, create it
+                table.create(bind=self.engine)
+    
+                # Print a message indicating that the table has been created
+                print(f"Table '{table_name}' created.")
+            else:
+                # If the table already exists, check for missing columns
+                for column in table.columns:
+                    # Check if the column does not exist in the existing table
+                    if column.name not in existing_table.columns:
+                        # If the column does not exist, add it to the existing table
+                        new_column = Column(
+                            column.name,
+                            column.type,
+                            primary_key=column.primary_key,
+                            nullable=column.nullable,
+                            default=column.default,
+                            unique=column.unique
+                        )
+                        with self.engine.connect() as con:
+                            add_query = f"ALTER TABLE {table_name} ADD COLUMN {new_column.compile(dialect=self.engine.dialect)}"
+                            con.execute(text(add_query))
+    
+                        # Print a message indicating that the column has been created
+                        print(f"Column '{column.name}' added to table '{table_name}'.")
 
     def save_sources(self, source_data_list):
         with self.Session() as session:
@@ -98,7 +172,7 @@ class DataBaseManager:
                     existing_metadata = None
 
                     if source_id:
-                        existing_metadata = session.query(Metadata).filter_by(source_id=source_id).first()
+                        existing_metadata = session.query(Meta).filter_by(source_id=source_id).first()
 
                     # ensure integers
                     for key in ['season', 'episode']:
@@ -109,7 +183,7 @@ class DataBaseManager:
                             for key, value in metadata_data.items():
                                 setattr(existing_metadata, key, value)
                     else:
-                        metadata_entry = Metadata(**metadata_data)
+                        metadata_entry = Meta(**metadata_data)
                         with session.begin_nested():
                             session.add(metadata_entry)
             except Exception as e:
@@ -119,7 +193,7 @@ class DataBaseManager:
     def get_metadata(self, source_id):
         with self.Session() as session:
             try:
-                metadata = session.query(Metadata).filter_by(source_id=source_id).first()
+                metadata = session.query(Meta).filter_by(source_id=source_id).first()
                 if metadata:
                     return {
                         'id': metadata.source_id,
@@ -133,7 +207,7 @@ class DataBaseManager:
                 print(f"Error getting metadata: {e}")
                 return None
 
-    def get_source_on_id(self, list_of_id, quality='M', only_not_downloaded=True, website=False):
+    def get_source_on_id(self, list_of_id, quality='M', only_not_downloaded=True, website=False, fileformat='mp4'):
         quality_column = {
             'H': 'url_video_hd',
             'M': 'url_video',
@@ -153,6 +227,9 @@ class DataBaseManager:
                     .filter(Downloaded.source_id.in_(list_of_id))
                 )
                 query = query.filter(~Source.id.in_(subquery))
+                
+            # Filtern nach dem passenden Dateiformat
+            query = query.filter(Source.fileformat == fileformat)
     
             sources = query.all()
 
@@ -181,6 +258,7 @@ class DataBaseManager:
                     'timestamp': source.timestamp,
                     'size': size_mb,
                     'channel' : source.channel,
+                    'format' : source.fileformat,
                 }
                 if website:
                     data['website'] = source.url_website
@@ -245,4 +323,4 @@ if __name__ == "__main__":
     # with DataBaseManager() as db_manager:
     #     db_manager.save_sources(example_data)
     self = DataBaseManager()
-    links = self.get_source_on_id(['LiJHLZQLdDfU9V6QKWEI0zLb41nM61v0CTd6TxQ8PzM='])
+    # links = self.get_source_on_id(['LiJHLZQLdDfU9V6QKWEI0zLb41nM61v0CTd6TxQ8PzM='])
