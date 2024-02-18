@@ -28,10 +28,23 @@ pd.set_option('display.max_colwidth', None)
 
 class mdownloader:
     def __init__(self, **kwargs):
-        self.args = {
-                    'free' : float(20),
-                    'quality' : 'H',
-                    'series_filter' : '',
+        self.args = {                   
+                    'free': float(20),
+                    'quality': 'M',
+                    'series_filter': '',
+                    'q': False,
+                    'configdir': os.path.join(os.environ['HOME'],'.config','mdl'),
+                    'download': os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),
+                    'search': 'spielfilm-highlights',
+                    'series': False,
+                    'channel': '',
+                    'mark_undone': False,
+                    'mark_done': False,
+                    'exclude': 'Audiodeskription,(ita),(swe)',
+                    'min_duration': 10,
+                    'title': False,
+                    'run': False,
+                    'file': False,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
