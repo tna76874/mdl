@@ -57,7 +57,7 @@ class mdownloader:
         self.args['logfile']  = os.path.join(self.args['configdir'],"processed.log")
         self.args['baseurl']  = "https://mediathekviewweb.de/feed?query="
         
-        self.DF_links = pd.DataFrame()
+        self._reset_dataframe()
         
         self.db = DataBaseManager(configdir=self.args['configdir'])
         
@@ -79,6 +79,9 @@ class mdownloader:
         if self.args['run'] & (not self.args['series']): self.download_movies()
 
         if self.args['series']: self.series_downloader()
+
+    def _reset_dataframe(self):
+        self.DF_links = pd.DataFrame()
         
     def processed(self, itemid):
         return self.db.is_downloaded(itemid)
@@ -113,6 +116,8 @@ class mdownloader:
                     pass
     
     def get_links(self):
+        self._reset_dataframe()
+
         QUERIES = [{'fields': ['title', 'topic'],'query': k} for k in self.args['search'].split(',')]
         if self.args['channel'].split(',') != ['']: QUERIES += [{'fields': ['channel'],'query': k} for k in self.args['channel'].split(',')]
         DF_links = pd.DataFrame()
