@@ -160,6 +160,9 @@ class DataBaseManager:
                         source_entry = Source(**source_data)
                         with session.begin_nested():
                             session.add(source_entry)
+                
+                session.commit()
+                
             except Exception as e:
                 print(f"Error saving sources: {e}")
                 session.rollback()
@@ -186,6 +189,8 @@ class DataBaseManager:
                         metadata_entry = Meta(**metadata_data)
                         with session.begin_nested():
                             session.add(metadata_entry)
+                    
+                session.commit()
             except Exception as e:
                 print(f"Error adding metadata: {e}")
                 session.rollback()
