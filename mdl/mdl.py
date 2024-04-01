@@ -17,9 +17,17 @@ from urllib.parse import urlparse
 
 try:
     from mdl.mdldb import DataBaseManager
+    from mdl.updater import *
 except:
     from mdldb import DataBaseManager
-    
+    from updater import *
+
+# get version
+try:
+    from mdl.__init__ import __version__
+except:
+    from __init__ import __version__
+current_version = __version__
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
@@ -333,7 +341,10 @@ class mdownloader:
 
 
 def main(headless=True):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        epilog=f"version {current_version}"
+    )
+
     parser.add_argument("--configdir", help="directory where config is stored", default=os.path.join(os.environ['HOME'],'.config','mdl'),type=str)
     parser.add_argument("--download", help="directory where downloads are stored", default=os.path.join(os.environ['HOME'],'Downloads','Downloads_mdl'),type=str)
     parser.add_argument("--search", help="Comma seperated search keywords", default="spielfilm-highlights",type=str)
@@ -351,8 +362,19 @@ def main(headless=True):
     parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of series.", action="store_true")
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
+    parser.add_argument("--version",  action="store_true", help=f"show version")
+    parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
+
 
     args = parser.parse_args()
+
+    if args.version:
+        print(f"{current_version}")
+        exit()
+        
+    if args.upgrade:
+        VersionCheck().ensure_latest_version()
+        exit()
   
     # init object
     if headless: _ = mdownloader(**vars(args))
