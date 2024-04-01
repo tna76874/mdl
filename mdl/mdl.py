@@ -15,11 +15,16 @@ import re
 from slugify import slugify
 from urllib.parse import urlparse
 
+# import database manager
 try:
     from mdl.mdldb import DataBaseManager
-    from mdl.updater import *
 except:
     from mdldb import DataBaseManager
+    
+# import updater
+try:
+    from mdl.updater import *
+except:
     from updater import *
 
 # get version
