@@ -45,6 +45,7 @@ class mdownloader:
                     'title': False,
                     'run': False,
                     'file': False,
+                    'index': [],
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -174,6 +175,9 @@ class mdownloader:
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
+            
+            if self.args['index']!=[]:
+                self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
             
     def _get_download_filename_from_url(self, URL):
             parsed_url = urlparse(URL)
@@ -346,8 +350,7 @@ def main(headless=True):
     parser.add_argument("--mark-undone", help="Mark found IDs as undone.", action="store_true")
     parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of series.", action="store_true")
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
-
-
+    parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
 
     args = parser.parse_args()
   
