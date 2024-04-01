@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 """
+from contextlib import contextmanager
 import os
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
@@ -53,11 +54,20 @@ class DataBaseManager:
         self.engine = create_engine(f"sqlite:///{db_path}")
         
         self.ensure_all_tables()
-
-        self.Session = sessionmaker(bind=self.engine)
         
         self.update_fileformat_from_url_video()
 
+    @contextmanager
+    def get_session(self):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        try:
+            yield session
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
     def __enter__(self):
         return self
@@ -70,27 +80,22 @@ class DataBaseManager:
         Aktualisiert das 'fileformat'-Attribut für alle Zeilen, in denen 'fileformat' NULL ist,
         indem der Wert aus 'url_video' ausgelesen wird.
         """
-        with self.Session() as session:
-            try:
-                # Alle Zeilen auswählen, in denen 'fileformat' NULL ist
-                null_fileformat_entries = session.query(Source).filter(Source.fileformat.is_(None)).all()
+        with self.get_session() as session:
+            # Alle Zeilen auswählen, in denen 'fileformat' NULL ist
+            null_fileformat_entries = session.query(Source).filter(Source.fileformat.is_(None)).all()
 
-                # Durch jede Zeile iterieren und 'fileformat' aktualisieren
-                for entry in null_fileformat_entries:
-                    # 'fileformat' aus 'url_video' auslesen
-                    try:
-                        fileformat = entry.url_video.split('.')[-1].lower()
-                    except:
-                        continue
+            # Durch jede Zeile iterieren und 'fileformat' aktualisieren
+            for entry in null_fileformat_entries:
+                # 'fileformat' aus 'url_video' auslesen
+                try:
+                    fileformat = entry.url_video.split('.')[-1].lower()
+                except:
+                    continue
 
-                    entry.fileformat = fileformat
-                        
-                # Änderungen in die Datenbank schreiben
-                session.commit()
-
-            except Exception as e:
-                print(f"Error updating fileformat from url_video: {e}")
-                session.rollback()
+                entry.fileformat = fileformat
+                    
+            # Änderungen in die Datenbank schreiben
+            session.commit()
     
     def ensure_all_tables(self):
         Base.metadata.create_all(self.engine)
@@ -135,81 +140,68 @@ class DataBaseManager:
                         print(f"Column '{column.name}' added to table '{table_name}'.")
 
     def save_sources(self, source_data_list):
-        with self.Session() as session:
-            try:
-                for source_data in source_data_list:
-                    source_id = source_data.get('id')
-                    existing_entry = None
+        with self.get_session() as session:
+            for source_data in source_data_list:
+                source_id = source_data.get('id')
+                existing_entry = None
 
-                    if source_id:
-                        existing_entry = session.query(Source).filter_by(id=source_id).first()
+                if source_id:
+                    existing_entry = session.query(Source).filter_by(id=source_id).first()
 
-                    # Convert relevant columns
-                    for key in ['timestamp', 'filmlisteTimestamp']:
-                        source_data[key] = datetime.fromtimestamp(int(source_data[key])) if source_data.get(key) else None
-                    source_data['duration'] = timedelta(seconds=source_data['duration']) if source_data.get('duration') else None
+                # Convert relevant columns
+                for key in ['timestamp', 'filmlisteTimestamp']:
+                    source_data[key] = datetime.fromtimestamp(int(source_data[key])) if source_data.get(key) else None
+                source_data['duration'] = timedelta(seconds=source_data['duration']) if source_data.get('duration') else None
 
 
-                    if existing_entry:
-                        # Update existing entry
-                        with session.begin_nested():
-                            for key, value in source_data.items():
-                                setattr(existing_entry, key, value)
-                    else:
-                        # Add new entry
-                        source_entry = Source(**source_data)
-                        with session.begin_nested():
-                            session.add(source_entry)
-                
-                session.commit()
-                
-            except Exception as e:
-                print(f"Error saving sources: {e}")
-                session.rollback()
+                if existing_entry:
+                    # Update existing entry
+                    with session.begin_nested():
+                        for key, value in source_data.items():
+                            setattr(existing_entry, key, value)
+                else:
+                    # Add new entry
+                    source_entry = Source(**source_data)
+                    with session.begin_nested():
+                        session.add(source_entry)
+            
+            session.commit()
                 
     def add_metadata(self, metadata_list):
-        with self.Session() as session:
-            try:
-                for metadata_data in metadata_list:
-                    source_id = metadata_data.get('source_id')
-                    existing_metadata = None
+        with self.get_session() as session:
+            for metadata_data in metadata_list:
+                source_id = metadata_data.get('source_id')
+                existing_metadata = None
 
-                    if source_id:
-                        existing_metadata = session.query(Meta).filter_by(source_id=source_id).first()
+                if source_id:
+                    existing_metadata = session.query(Meta).filter_by(source_id=source_id).first()
 
-                    # ensure integers
-                    for key in ['season', 'episode']:
-                        metadata_data[key] = int(metadata_data[key]) if metadata_data.get(key) else None
+                # ensure integers
+                for key in ['season', 'episode']:
+                    metadata_data[key] = int(metadata_data[key]) if metadata_data.get(key) else None
 
-                    if existing_metadata:
-                        with session.begin_nested():
-                            for key, value in metadata_data.items():
-                                setattr(existing_metadata, key, value)
-                    else:
-                        metadata_entry = Meta(**metadata_data)
-                        with session.begin_nested():
-                            session.add(metadata_entry)
-                    
-                session.commit()
-            except Exception as e:
-                print(f"Error adding metadata: {e}")
-                session.rollback()
+                if existing_metadata:
+                    with session.begin_nested():
+                        for key, value in metadata_data.items():
+                            setattr(existing_metadata, key, value)
+                else:
+                    metadata_entry = Meta(**metadata_data)
+                    with session.begin_nested():
+                        session.add(metadata_entry)
+                
+            session.commit()
                 
     def get_metadata(self, source_id):
-        with self.Session() as session:
-            try:
-                metadata = session.query(Meta).filter_by(source_id=source_id).first()
-                if metadata:
-                    return {
-                        'id': metadata.source_id,
-                        'series': metadata.series,
-                        'season': metadata.season,
-                        'episode': metadata.episode
-                    }
-                else:
-                    return None
-            except Exception as e:
-                print(f"Error getting metadata: {e}")
+        with self.get_session() as session:
+            metadata = session.query(Meta).filter_by(source_id=source_id).first()
+            if metadata:
+                return {
+                    'id': metadata.source_id,
+                    'series': metadata.series,
+                    'season': metadata.season,
+                    'episode': metadata.episode
+                }
+            else:
                 return None
 
     def get_source_on_id(self, list_of_id, quality='M', only_not_downloaded=True, website=False, fileformat='mp4'):
@@ -219,7 +211,7 @@ class DataBaseManager:
             'L': 'url_video_low',
         }
 
-        with self.Session() as session:
+        with self.get_session() as session:
             # Basisabfrage für Quellen
             query = (
                 session.query(Source)
@@ -273,30 +265,24 @@ class DataBaseManager:
             return result
 
     def mark_as_downloaded(self, list_of_id):
-        with self.Session() as session:
-            try:
-                for item_id in list_of_id:
-                    downloaded_item = Downloaded(source_id=item_id)
-                    session.add(downloaded_item)
+        with self.get_session() as session:
+            for item_id in list_of_id:
+                downloaded_item = Downloaded(source_id=item_id)
+                session.add(downloaded_item)
 
-                session.commit()
-            except IntegrityError:
-                session.rollback()
+            session.commit()
 
     def mark_as_not_downloaded(self, list_of_id):
-        with self.Session() as session:
-            try:
-                for item_id in list_of_id:
-                    downloaded_item = session.query(Downloaded).filter_by(source_id=item_id).first()
-                    if downloaded_item:
-                        session.delete(downloaded_item)
-    
-                session.commit()
-            except IntegrityError:
-                session.rollback()
+        with self.get_session() as session:
+            for item_id in list_of_id:
+                downloaded_item = session.query(Downloaded).filter_by(source_id=item_id).first()
+                if downloaded_item:
+                    session.delete(downloaded_item)
+
+            session.commit()
                 
     def is_downloaded(self, item_id):
-        with self.Session() as session:
+        with self.get_session() as session:
             downloaded_item = (
                 session.query(Downloaded)
                 .filter_by(source_id=item_id)
