@@ -198,7 +198,7 @@ class mdownloader:
             if self.args['imdb']!=None:
                 self._update_imdb_info(DF_links)
                 DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values))
-                DF_links = DF_links[DF_links['rating']>=self.args['imbd']]
+                DF_links = DF_links[DF_links['rating']>=self.args['imdb']]
                 DF_links = DF_links.sort_values(by='size', ascending=False).drop_duplicates(subset='imdb', keep='first')
             
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
