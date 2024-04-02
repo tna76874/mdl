@@ -4,3 +4,5 @@ requests
 python-slugify==8.0.1
 beautifulsoup4==4.12.2
 SQLAlchemy==2.0.25
+PyMovieDb==0.0.9
+packaging

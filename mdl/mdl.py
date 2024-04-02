@@ -14,6 +14,8 @@ import datetime
 import re
 from slugify import slugify
 from urllib.parse import urlparse
+from PyMovieDb import IMDB
+from tqdm import tqdm
 
 # import database manager
 try:
@@ -59,6 +61,7 @@ class mdownloader:
                     'run': False,
                     'file': False,
                     'index': [],
+                    'imbd': None,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -191,6 +194,28 @@ class mdownloader:
             
             if self.args['index']!=[]:
                 self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
+                
+            if not self.args['imbd']==None:
+                self._update_imdb_info()
+                self.DF_links['rating'] = self.DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(self.DF_links['imdb'].values))
+                self.DF_links = self.DF_links[self.DF_links['rating']>=self.args['imbd']]
+
+    
+    def _update_imdb_info(self):
+        imdb = IMDB()
+        DF_imbd = self.DF_links[self.DF_links['imdb_parsed']==False]
+        total_rows = len(DF_imbd)
+        for _,row in tqdm(DF_imbd.iterrows(), desc="Parsing information from IMDB", total=total_rows):
+            try:
+                entry = self.db.load_json_or_use_dict(imdb.get_by_name(row['title'], tv=False))
+                if entry.get('status', 200)==200:
+                    self.db._add_imdb_entry(entry, row['id'])
+            except:
+                pass
+            
+            finally:
+                self.db.save_sources([{'id':source_id, 'imbd_parsed':True}])
+            
             
     def _get_download_filename_from_url(self, URL):
             parsed_url = urlparse(URL)
@@ -367,6 +392,7 @@ def main(headless=True):
     parser.add_argument("--series", help="Automatic series downloader (zdf.de/serien) of series.", action="store_true")
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
+    parser.add_argument("--imdb", help="IMDB rating filter", type=float)
     parser.add_argument("--version",  action="store_true", help=f"show version")
     parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
 

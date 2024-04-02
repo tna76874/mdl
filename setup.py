@@ -22,6 +22,7 @@ setup(
         "beautifulsoup4",
         "SQLAlchemy",
         "packaging",
+        "PyMovieDb",
     ],
     classifiers=[
         'Development Status :: 1 - Planning',

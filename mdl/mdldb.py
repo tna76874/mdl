@@ -4,6 +4,8 @@
 """
 from contextlib import contextmanager
 import os
+import json
+import re
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, joinedload
@@ -24,6 +26,8 @@ class Meta(Base):
 class Source(Base):
     __tablename__ = 'source'
     id = Column(String, primary_key=True)
+    imbd_id = Column(String)
+    imbd_parsed = Column(Boolean, default=False)
     channel = Column(String)
     topic = Column(String)
     title = Column(String)
@@ -38,6 +42,13 @@ class Source(Base):
     url_video_hd = Column(String)
     filmlisteTimestamp = Column(DateTime)
     fileformat = Column(String)
+    
+class IMDBEntry(Base):
+    __tablename__ = 'imdb'
+    imdb_id = Column(String,  primary_key=True)
+    typ = Column(String)
+    name = Column(String)
+    rating = Column(Float)
 
 class Downloaded(Base):
     __tablename__ = 'downloaded'
@@ -74,6 +85,56 @@ class DataBaseManager:
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+
+    def get_ratings_for_imdb_ids(self, imdb_ids):
+        """
+        Ruft Bewertungen für eine Liste von IMDb-IDs ab.
+        
+        :param imdb_ids: Eine Liste von IMDb-IDs
+        :return: Ein Dictionary, das IMDb-IDs als Schlüssel und Bewertungen als Werte enthält
+        """
+        imdb_ids = [imdb_id for imdb_id in imdb_ids if imdb_id is not None]
+        ratings = {}
+        with self.get_session() as session:
+            existing_entries = session.query(IMDBEntry).filter(
+                IMDBEntry.imdb_id.in_(imdb_ids),
+                IMDBEntry.rating.isnot(None)
+            ).all()
+            for entry in existing_entries:
+                ratings[entry.imdb_id] = entry.rating
+        return ratings
+
+    def _add_imdb_entry(self, entry, source_id):
+        """
+        Fügt einen IMDB-Eintrag in die Datenbank ein.
+        """
+        with self.get_session() as session:
+            entry = self.load_json_or_use_dict(entry)
+            if entry:
+                imdb_id_match = re.search(r'/tt(\d+)/', entry.get('url'))
+                imdb_id = 'tt' + imdb_id_match.group(1) if imdb_id_match else None
+                
+                existing_entry = session.query(IMDBEntry).filter_by(imdb_id=imdb_id).first()
+                if not existing_entry:   
+                    imdb_entry = IMDBEntry(
+                        typ=entry.get('type'),
+                        name=entry.get('name'),
+                        imdb_id=imdb_id,
+                        rating=entry.get('rating', {}).get('ratingValue')
+                    )
+                    session.add(imdb_entry)
+                    session.commit()
+                    
+                    self.save_sources([{'id':source_id, 'imbd_id':imdb_id, 'imbd_parsed':True}])
+
+    @staticmethod
+    def load_json_or_use_dict(input_data):
+        if isinstance(input_data, dict):
+            return input_data
+        try:
+            return json.loads(input_data)
+        except json.JSONDecodeError:
+            return None
     
     def update_fileformat_from_url_video(self):
         """
@@ -256,6 +317,8 @@ class DataBaseManager:
                     'size': size_mb,
                     'channel' : source.channel,
                     'format' : source.fileformat,
+                    'imdb' : source.imbd_id,
+                    'imdb_parsed' : source.imbd_parsed==True,
                 }
                 if website:
                     data['website'] = source.url_website
