@@ -9,12 +9,12 @@ from queue import Queue
 from tqdm import tqdm
 
 class ThreadedWorker:
-    def __init__(self, data, worker_function, threads=4):
+    def __init__(self, data, worker_function, threads=10):
         self.data = data
         self.worker_function = worker_function
         self.total_tasks = len(data)
         self.queue = Queue()
-        self.threads = threads
+        self.threads = min([threads, self.total_tasks])
 
     def _worker(self):
         while True:
