@@ -61,7 +61,7 @@ class mdownloader:
                     'run': False,
                     'file': False,
                     'index': [],
-                    'imbd': None,
+                    'imdb': None,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -191,7 +191,7 @@ class mdownloader:
             # sort after publish date
             DF_links.sort_values('timestamp',inplace=True)
             
-            if not self.args['imbd']==None:
+            if self.args['imdb']!=None:
                 self._update_imdb_info()
                 self.DF_links['rating'] = self.DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(self.DF_links['imdb'].values))
                 self.DF_links = self.DF_links[self.DF_links['rating']>=self.args['imbd']]
