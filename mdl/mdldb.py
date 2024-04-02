@@ -137,7 +137,7 @@ class DataBaseManager:
                         name=entry.get('name'),
                         imdb_id=imdb_id,
                         rating=entry.get('rating', {}).get('ratingValue'),
-                        published=datetime.strptime(entry.get('datePublished', '1970-01-01'), "%Y-%m-%d")
+                        published = datetime.strptime(entry.get('datePublished') if entry.get('datePublished') is not None else '1970-01-01', "%Y-%m-%d")
                     )
                     session.add(imdb_entry)
                     session.commit()
