@@ -15,19 +15,17 @@ import re
 from slugify import slugify
 from urllib.parse import urlparse
 from PyMovieDb import IMDB
-from thworker import *
 
-# import database manager
+# import modules
 try:
     from mdl.mdldb import DataBaseManager
+    from mdl.updater import *
+    from mdl.thworker import *
 except:
     from mdldb import DataBaseManager
-    
-# import updater
-try:
-    from mdl.updater import *
-except:
     from updater import *
+    from thworker import *
+
 
 # get version
 try:
