@@ -229,6 +229,9 @@ class mdownloader:
         DF_imdb = DF_links[DF_links['imdb_parsed']==False]
         total_rows = len(DF_imdb)
         self.queue = Queue()
+        
+        #cleanup database
+        self.db.drop_ratings_without_year()
                 
         # Start worker threads
         workers=[]

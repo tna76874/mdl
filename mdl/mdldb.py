@@ -49,6 +49,8 @@ class IMDBEntry(Base):
     typ = Column(String)
     name = Column(String)
     rating = Column(Float)
+    published = Column(DateTime)
+
 
 class Downloaded(Base):
     __tablename__ = 'downloaded'
@@ -85,12 +87,25 @@ class DataBaseManager:
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+    
+    def drop_ratings_without_year(self):
+        """
+        Entfernt Bewertungen, bei denen das Veröffentlichungsjahr nicht angegeben ist.
+        """
+        with self.get_session() as session:
+            entries_to_remove = session.query(IMDBEntry).filter(
+                IMDBEntry.published == None
+            ).all()
+            for entry in entries_to_remove:
+                session.delete(entry)
+            session.commit()
 
-    def get_ratings_for_imdb_ids(self, imdb_ids):
+    def get_ratings_for_imdb_ids(self, imdb_ids, year=2000):
         """
         Ruft Bewertungen für eine Liste von IMDb-IDs ab.
         
         :param imdb_ids: Eine Liste von IMDb-IDs
+        :param year: Das Jahr, ab dem Einträge berücksichtigt werden sollen (Standardwert: 2000)
         :return: Ein Dictionary, das IMDb-IDs als Schlüssel und Bewertungen als Werte enthält
         """
         imdb_ids = [imdb_id for imdb_id in imdb_ids if imdb_id is not None]
@@ -98,7 +113,8 @@ class DataBaseManager:
         with self.get_session() as session:
             existing_entries = session.query(IMDBEntry).filter(
                 IMDBEntry.imdb_id.in_(imdb_ids),
-                IMDBEntry.rating.isnot(None)
+                IMDBEntry.rating.isnot(None),
+                IMDBEntry.published >= datetime(year, 1, 1)
             ).all()
             for entry in existing_entries:
                 ratings[entry.imdb_id] = entry.rating
@@ -120,7 +136,8 @@ class DataBaseManager:
                         typ=entry.get('type'),
                         name=entry.get('name'),
                         imdb_id=imdb_id,
-                        rating=entry.get('rating', {}).get('ratingValue')
+                        rating=entry.get('rating', {}).get('ratingValue'),
+                        published=datetime.strptime(entry.get('datePublished'), "%Y-%m-%d")
                     )
                     session.add(imdb_entry)
                     session.commit()
