@@ -11,17 +11,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, joinedload
 from datetime import datetime, timedelta, timezone
 from PyMovieDb import IMDB
+import importlib
 local_timezone = timezone(timedelta(hours=1))
 
 # import modules
-try:
-    from mdl.mdldb import DataBaseManager
-    from mdl.updater import *
-    from mdl.thworker import *
-except:
-    from mdldb import DataBaseManager
-    from updater import *
-    from thworker import *
+modules = [
+    "mdl.thworker",
+]
+
+for module in modules:
+    try:
+        globals()[module.split('.')[-1]] = importlib.import_module(module)
+    except ImportError:
+        globals()[module.split('.')[-1]] = importlib.import_module(module.split('.')[-1])
 
 Base = declarative_base()
 

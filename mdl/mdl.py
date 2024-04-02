@@ -15,16 +15,21 @@ import re
 from slugify import slugify
 from urllib.parse import urlparse
 from PyMovieDb import IMDB
+import importlib
+
 
 # import modules
-try:
-    from mdl.mdldb import DataBaseManager
-    from mdl.updater import *
-    from mdl.thworker import *
-except:
-    from mdldb import DataBaseManager
-    from updater import *
-    from thworker import *
+modules = [
+    "mdl.mdldb",
+    "mdl.updater",
+    "mdl.thworker",
+]
+
+for module in modules:
+    try:
+        globals()[module.split('.')[-1]] = importlib.import_module(module)
+    except ImportError:
+        globals()[module.split('.')[-1]] = importlib.import_module(module.split('.')[-1])
 
 
 # get version
