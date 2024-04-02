@@ -6,10 +6,12 @@ from contextlib import contextmanager
 import os
 import json
 import re
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, joinedload
 from datetime import datetime, timedelta, timezone
+from PyMovieDb import IMDB
+from thworker import *
 local_timezone = timezone(timedelta(hours=1))
 
 
@@ -50,7 +52,7 @@ class IMDBEntry(Base):
     name = Column(String)
     rating = Column(Float)
     published = Column(DateTime)
-
+    genre = Column(String)
 
 class Downloaded(Base):
     __tablename__ = 'downloaded'
@@ -88,6 +90,43 @@ class DataBaseManager:
     def __exit__(self, exc_type, exc_value, traceback):
         pass
     
+    def _drop_imdb_id(self, id):
+        with self.get_session() as session:
+            entry = session.query(IMDBEntry).filter_by(imdb_id=id).first()
+            if entry:
+                session.delete(entry)
+                session.commit()
+        
+    def _reparse_imdb_item(self, imdb_id):
+        try:
+            entry = self.load_json_or_use_dict(self.imdb.get_by_id(imdb_id))
+            if entry.get('status', 200) == 200:
+                self._add_imdb_entry(entry, source_id=None)
+            else:
+                if entry.get('status') == 404:
+                    self._drop_imdb_id(imdb_id)
+
+        except Exception as e:
+            print(f"Error updating IMDB info for id '{imdb_id}': {e}")
+            
+    def _reparse_imdb_items(self):
+        data = [{'imdb_id': value} for value in self._get_imdb_id_to_reparse()]
+
+        self.imdb = IMDB()
+        myworker = ThreadedWorker(data, self._reparse_imdb_item)
+        myworker.start_processing()
+
+    def _get_imdb_id_to_reparse(self):
+        """
+        Gibt eine Liste von IMDB-IDs zurück, bei denen das Genre None ist.
+        """
+        with self.get_session() as session:
+            ids_to_reparse = []
+            entries_to_reparse = session.query(IMDBEntry).filter_by(genre=None).all()
+            for entry in entries_to_reparse:
+                ids_to_reparse.append(entry.imdb_id)
+            return ids_to_reparse
+    
     def drop_ratings_without_year(self):
         """
         Entfernt Bewertungen, bei denen das Veröffentlichungsjahr nicht angegeben ist.
@@ -114,13 +153,15 @@ class DataBaseManager:
             existing_entries = session.query(IMDBEntry).filter(
                 IMDBEntry.imdb_id.in_(imdb_ids),
                 IMDBEntry.rating.isnot(None),
-                IMDBEntry.published >= datetime(year, 1, 1)
+                IMDBEntry.published >= datetime(year, 1, 1),
+                not_(IMDBEntry.genre.like('%Documentary%')),
+                not_(IMDBEntry.genre.like('%Biography%'))
             ).all()
             for entry in existing_entries:
                 ratings[entry.imdb_id] = entry.rating
         return ratings
 
-    def _add_imdb_entry(self, entry, source_id):
+    def _add_imdb_entry(self, entry, source_id=None):
         """
         Fügt einen IMDB-Eintrag in die Datenbank ein.
         """
@@ -131,17 +172,26 @@ class DataBaseManager:
                 imdb_id = 'tt' + imdb_id_match.group(1) if imdb_id_match else None
                 
                 existing_entry = session.query(IMDBEntry).filter_by(imdb_id=imdb_id).first()
-                if not existing_entry:   
-                    imdb_entry = IMDBEntry(
-                        typ=entry.get('type'),
-                        name=entry.get('name'),
-                        imdb_id=imdb_id,
-                        rating=entry.get('rating', {}).get('ratingValue'),
-                        published = datetime.strptime(entry.get('datePublished') if entry.get('datePublished') is not None else '1970-01-01', "%Y-%m-%d")
-                    )
-                    session.add(imdb_entry)
-                    session.commit()
-                    
+                source_data = {
+                    'typ': entry.get('type'),
+                    'name': entry.get('name'),
+                    'rating': entry.get('rating', {}).get('ratingValue'),
+                    'published': datetime.strptime(entry.get('datePublished') if entry.get('datePublished')!=None else '1970-01-01', "%Y-%m-%d"),
+                    'genre': ','.join(entry.get('genre') if entry.get('genre')!=None else ['UNDEFINED'])
+                }
+            
+                if existing_entry:
+                    # Update existing entry
+                    for key, value in source_data.items():
+                        setattr(existing_entry, key, value)
+                else:
+                    # Add new entry
+                    source_data['imdb_id'] = imdb_id
+                    session.add(IMDBEntry(**source_data))
+                
+                session.commit()
+
+                if source_id:
                     self.save_sources([{'id':source_id, 'imbd_id':imdb_id, 'imbd_parsed':True}])
 
     @staticmethod
