@@ -66,6 +66,7 @@ class mdownloader:
                     'index': [],
                     'imdb': None,
                     'threads': 10,
+                    'year' : 2000,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -197,7 +198,7 @@ class mdownloader:
             
             if self.args['imdb']!=None:
                 self._update_imdb_info(DF_links)
-                DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values))
+                DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values, year=self.args['year']))
                 DF_links = DF_links[DF_links['rating']>=self.args['imdb']]
                 DF_links = DF_links.sort_values(by='size', ascending=False).drop_duplicates(subset='imdb', keep='first')
             
@@ -447,6 +448,7 @@ def main(headless=True):
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
     parser.add_argument("--imdb", help="IMDB rating filter", type=float)
+    parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int)
     parser.add_argument("--version",  action="store_true", help=f"show version")
     parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
 
