@@ -123,10 +123,12 @@ class DataBaseManager:
             
     def _reparse_imdb_items(self):
         data = [{'imdb_id': value} for value in self._get_imdb_id_to_reparse()]
-
-        self.imdb = IMDB()
-        myworker = ThreadedWorker(data, self._reparse_imdb_item)
-        myworker.start_processing()
+        
+        if len(data)>0:
+            print('Cleanup IMDB data')
+            self.imdb = IMDB()
+            myworker = ThreadedWorker(data, self._reparse_imdb_item)
+            myworker.start_processing()
 
     def _get_imdb_id_to_reparse(self):
         """

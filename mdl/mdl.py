@@ -224,8 +224,12 @@ class mdownloader:
         self.imdb = IMDB()
         DF_imdb = DF_links[DF_links['imdb_parsed']==False][['id','title']]
         DF_imdb = DF_imdb.rename(columns={'id':'source_id'})
-        myworker = ThreadedWorker(DF_imdb.to_dict(orient='records'), self._update_imdb_info_entry)
-        myworker.start_processing()
+        data = DF_imdb.to_dict(orient='records')
+        
+        if len(data)>0:
+            print('Getting metadata from IMDB')
+            myworker = ThreadedWorker(data, self._update_imdb_info_entry)
+            myworker.start_processing()
             
     def _get_download_filename_from_url(self, URL):
             parsed_url = urlparse(URL)
@@ -403,7 +407,7 @@ def main(headless=True):
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
     parser.add_argument("--imdb", help="IMDB rating filter", type=float)
-    parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int)
+    parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int, default=2000)
     parser.add_argument("--version",  action="store_true", help=f"show version")
     parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
 
