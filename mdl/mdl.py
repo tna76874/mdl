@@ -16,6 +16,9 @@ from slugify import slugify
 from urllib.parse import urlparse
 from PyMovieDb import IMDB
 from tqdm import tqdm
+import threading
+import time
+from queue import Queue
 
 # import database manager
 try:
@@ -62,6 +65,7 @@ class mdownloader:
                     'file': False,
                     'index': [],
                     'imdb': None,
+                    'threads': 10,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -203,22 +207,66 @@ class mdownloader:
             
             if self.args['index']!=[]:
                 self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
-    
-    def _update_imdb_info(self, DF_links):
-        imdb = IMDB()
-        DF_imbd = DF_links[DF_links['imdb_parsed']==False]
-        total_rows = len(DF_imbd)
-        for _,row in tqdm(DF_imbd.iterrows(), desc="Parsing information from IMDB", total=total_rows):
+
+    def _update_imdb_info_entry(self):
+        while True:
+            item = self.queue.get()
+            if item is None:
+                break
+            title, source_id = item
             try:
-                entry = self.db.load_json_or_use_dict(imdb.get_by_name(row['title'], tv=False))
-                if entry.get('status', 200)==200:
-                    self.db._add_imdb_entry(entry, row['id'])
-            except:
-                pass
-            
+                entry = self.db.load_json_or_use_dict(self.imdb.get_by_name(title, tv=False))
+                if entry.get('status', 200) == 200:
+                    self.db._add_imdb_entry(entry, source_id)
+            except Exception as e:
+                print(f"Error updating IMDB info for title '{title}': {e}")
             finally:
-                self.db.save_sources([{'id':row['id'], 'imbd_parsed':True}])
+                self.db.save_sources([{'id': source_id, 'imdb_parsed': True}])
+                self.queue.task_done()
+
+    def _update_imdb_info(self, DF_links):
+        self.imdb = IMDB()
+        DF_imdb = DF_links[DF_links['imdb_parsed']==False]
+        total_rows = len(DF_imdb)
+        self.queue = Queue()
+                
+        # Start worker threads
+        workers=[]
+        for _ in range(self.args['threads']):
+            worker = threading.Thread(target=self._update_imdb_info_entry)
+            worker.start()
+            workers.append(worker)
+        
+        # Fill the queue with tasks
+        for _, row in DF_imdb.iterrows():
+            self.queue.put((row['title'], row['id']))
             
+        # Function to update progress bar with queue length
+        def update_progress_bar():
+            with tqdm(total=total_rows) as pbar:
+                while True:
+                    pbar.update(total_rows - self.queue.qsize() - pbar.n)
+    
+                    # If all tasks are done, break the loop
+                    if self.queue.empty():
+                        break
+                    time.sleep(1)
+
+        progress_thread = threading.Thread(target=update_progress_bar)
+        progress_thread.start()
+
+        # Wait for all tasks to be processed
+        self.queue.join()
+
+        # Stop progress bar update thread
+        progress_thread.join()
+
+        # Stop worker threads
+        for _ in range(self.args['threads']):
+            self.queue.put(None)
+
+        for worker in workers:
+            worker.join()
             
     def _get_download_filename_from_url(self, URL):
             parsed_url = urlparse(URL)
