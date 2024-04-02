@@ -192,7 +192,7 @@ class mdownloader:
             DF_links.sort_values('timestamp',inplace=True)
             
             if self.args['imdb']!=None:
-                self._update_imdb_info()
+                self._update_imdb_info(DF_links)
                 DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values))
                 DF_links = DF_links[DF_links['rating']>=self.args['imbd']]
             
@@ -203,9 +203,9 @@ class mdownloader:
             if self.args['index']!=[]:
                 self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
     
-    def _update_imdb_info(self):
+    def _update_imdb_info(self, DF_links):
         imdb = IMDB()
-        DF_imbd = self.DF_links[self.DF_links['imdb_parsed']==False]
+        DF_imbd = DF_links[self.DF_links['imdb_parsed']==False]
         total_rows = len(DF_imbd)
         for _,row in tqdm(DF_imbd.iterrows(), desc="Parsing information from IMDB", total=total_rows):
             try:
