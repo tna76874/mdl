@@ -205,7 +205,7 @@ class mdownloader:
     
     def _update_imdb_info(self, DF_links):
         imdb = IMDB()
-        DF_imbd = DF_links[self.DF_links['imdb_parsed']==False]
+        DF_imbd = DF_links[DF_links['imdb_parsed']==False]
         total_rows = len(DF_imbd)
         for _,row in tqdm(DF_imbd.iterrows(), desc="Parsing information from IMDB", total=total_rows):
             try:
