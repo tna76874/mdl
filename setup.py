@@ -23,6 +23,7 @@ setup(
         "SQLAlchemy",
         "packaging",
         "PyMovieDb",
+        "lxml_html_clean",
     ],
     classifiers=[
         'Development Status :: 1 - Planning',
