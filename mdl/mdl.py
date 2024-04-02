@@ -188,18 +188,17 @@ class mdownloader:
             # sort after publish date
             DF_links.sort_values('timestamp',inplace=True)
             
+            if not self.args['imbd']==None:
+                self._update_imdb_info()
+                self.DF_links['rating'] = self.DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(self.DF_links['imdb'].values))
+                self.DF_links = self.DF_links[self.DF_links['rating']>=self.args['imbd']]
+            
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
                 
             self.DF_links = DF_links.reset_index(drop=True)
             
             if self.args['index']!=[]:
                 self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
-                
-            if not self.args['imbd']==None:
-                self._update_imdb_info()
-                self.DF_links['rating'] = self.DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(self.DF_links['imdb'].values))
-                self.DF_links = self.DF_links[self.DF_links['rating']>=self.args['imbd']]
-
     
     def _update_imdb_info(self):
         imdb = IMDB()
