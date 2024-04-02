@@ -175,6 +175,9 @@ class mdownloader:
                             '(dan)',
                             'Hörfassung',
                             '(Englische Originalfassung)',
+                            '(Originalversion)',
+                            'Originalversion',
+                            'Originalfassung',
                             ]
             for i in list(set(self.args['exclude'].split(',')) | set(excluded_tags)):
                 DF_links = DF_links[(~DF_links['title'].str.contains(i, regex=False))]
