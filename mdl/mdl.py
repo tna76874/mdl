@@ -415,7 +415,7 @@ class mdownloader:
             'year': metadata.get('p_year') or '',
             'imdbid': metadata.get('imdb') or '',
             'country': metadata.get('p_land') or '',
-            'dateadded': metadata.get('timestamp') or '',
+            'dateadded': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
     
         nfo_content = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
