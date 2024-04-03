@@ -261,7 +261,8 @@ class DataBaseManager:
         
     def _update_imdb_info_entry(self, source_id=None, title=None, tv=False, year=None):
         try:
-            entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv, year=int(year)))
+            year = None if year==None else int(year)
+            entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv, year=year)
             if entry.get('status', 200) == 200:
                 self._add_imdb_entry(entry, source_id=source_id)
         except Exception as e:
