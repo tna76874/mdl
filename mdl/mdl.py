@@ -93,7 +93,7 @@ class mdownloader:
 
         if (self.args['imdb_reset'] == False): self.db._reset_imdb()
         
-        if self.args['imdb']!=None: self.args['search']='Spielfilm,Kino Film,Filme im Ersten'
+        if self.args['imdb']!=None: self.args['search']='Spielfilm,Kino Film,Filme im Ersten,Filme'
 
         if (self.args['search'] != None) & (not self.args['series']): self.get_info()
         
@@ -193,6 +193,11 @@ class mdownloader:
         modified_df.loc[first_channel_mask, ['p_land', 'p_year']] = parsed_df[['land', 'year']].values
         modified_df.loc[first_channel_mask, 'p_title'] = modified_df.loc[first_channel_mask, 'title']
         
+        ### ARD FILME
+        # Übernahme von 'p_title' aus 'title', wo 'channel' den Wert 'ARD' und 'topic' den Wert 'Filme' hat
+        ard_filme_mask = (modified_df['channel'] == 'ARD') & (modified_df['topic'] == 'Filme')
+        modified_df.loc[ard_filme_mask, 'p_title'] = modified_df.loc[ard_filme_mask, 'title']       
+            
         return modified_df
     
     def get_links(self):
@@ -274,11 +279,15 @@ class mdownloader:
         
         DF_imdb = DF_links[DF_links['imdb_parsed']==False][['id','p_title', 'p_year']]
         DF_imdb = DF_imdb.rename(columns={'id':'source_id','p_title':'title','p_year':'year',})
-        data = DF_imdb.to_dict(orient='records')
         
+        data = DF_imdb[~pd.isnull(DF_imdb['year'])].to_dict(orient='records')
         if len(data)>0:
-            print('Getting metadata from IMDB')
-            myworker = ThreadedWorker(data, self.db._update_imdb_info_entry)
+            myworker = ThreadedWorker(data, self.db._update_imdb_info_entry, info='Getting metadata from IMDB (TAGGED)')
+            myworker.start_processing()
+
+        data = DF_imdb[pd.isnull(DF_imdb['year'])].to_dict(orient='records')
+        if len(data)>0:
+            myworker = ThreadedWorker(data, self.db._update_imdb_info_entry, info='Getting metadata from IMDB (UNTAGGED)')
             myworker.start_processing()
             
     def _get_download_filename_from_url(self, URL):
