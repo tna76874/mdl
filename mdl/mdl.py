@@ -67,6 +67,7 @@ class mdownloader:
                     'threads': 10,
                     'year' : 2000,
                     'imdb_reset' : False,
+                    'nfo' : False,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -385,7 +386,7 @@ class mdownloader:
             else:
                 os.remove(PARTIAL_FILENAME)
                 
-        return success
+        return success, DOWNLOAD_BASEDIR, DOWNLOAD_FILENAME
 
     def download_movies(self):
         for i, row in self.DF_links.iterrows():
@@ -397,12 +398,36 @@ class mdownloader:
                 TITLE = os.path.join(f'Staffel {meta["season"]:d}',f'S{meta["season"]:02d}E{meta["episode"]:02d}_{TITLE}')
 
             if (self.check_free_space() - self.DF_links.loc[i,'size'] / 1024) > float(self.args['free']):
-                is_downloaded = self.wget(row, TITLE)
+                is_downloaded, DOWNLOAD_BASEDIR, DOWNLOAD_FILENAME = self.wget(row, TITLE)
 
                 if not self.args['q'] and is_downloaded:
                     self.db.mark_as_downloaded([self.DF_links.loc[i,'id']])
+                    if (self.args['imdb']!=None) or (self.args['nfo']==True):
+                        nfo_filename = DOWNLOAD_FILENAME.replace('.mp4','')
+                        self.create_movie_nfo(row, DOWNLOAD_BASEDIR, filename=nfo_filename)
             else:
                 print("No free disk space. Skip download.")
+                
+    def create_movie_nfo(self, metadata, download_path, filename='movie'):
+        nfo_data = {
+            'title': metadata.get('p_title') or metadata.get('title') or '',
+            'plot': metadata.get('description') or '',
+            'year': metadata.get('p_year') or '',
+            'imdbid': metadata.get('imdb') or '',
+            'country': metadata.get('p_land') or '',
+            'dateadded': metadata.get('timestamp') or '',
+        }
+    
+        nfo_content = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        nfo_content += '<movie>\n'
+        for tag, value in nfo_data.items():
+            nfo_content += f'    <{tag}>{value}</{tag}>\n'
+        nfo_content += '</movie>'
+    
+        nfo_file_path = os.path.join(download_path, f'{filename}.nfo')
+    
+        with open(nfo_file_path, 'w', encoding='utf-8') as nfo_file:
+            nfo_file.write(nfo_content)
                 
     def series_downloader(self):
         url = "https://www.zdf.de/serien"
@@ -476,6 +501,7 @@ def main(headless=True):
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
     parser.add_argument("--imdb", help="IMDB rating filter", type=float)
     parser.add_argument("--imdb-reset", help="IMDB reset", action="store_true")
+    parser.add_argument("--nfo", help="create movies.nfo in download folder", action="store_true")
     parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int, default=2000)
     parser.add_argument("--version",  action="store_true", help=f"show version")
     parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
