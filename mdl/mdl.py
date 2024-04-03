@@ -58,7 +58,7 @@ class mdownloader:
                     'mark_undone': False,
                     'mark_done': False,
                     'exclude': 'Audiodeskription,(ita),(swe)',
-                    'min_duration': 10,
+                    'min_duration': 20,
                     'title': False,
                     'run': False,
                     'file': False,
@@ -207,28 +207,17 @@ class mdownloader:
             
             if self.args['index']!=[]:
                 self.DF_links = self.DF_links[self.DF_links.index.isin(self.args['index'])]
-
-    def _update_imdb_info_entry(self, source_id=None, title=None):
-        try:
-            entry = self.db.load_json_or_use_dict(self.imdb.get_by_name(title, tv=False))
-            if entry.get('status', 200) == 200:
-                self.db._add_imdb_entry(entry, source_id=source_id)
-        except Exception as e:
-            print(f"Error updating IMDB info for title '{title}': {e}")
-        finally:
-            self.db.save_sources([{'id': source_id, 'imdb_parsed': True}])
     
     def _update_imdb_info(self, DF_links):
         self.db._reparse_imdb_items()
         
-        self.imdb = IMDB()
         DF_imdb = DF_links[DF_links['imdb_parsed']==False][['id','title']]
         DF_imdb = DF_imdb.rename(columns={'id':'source_id'})
         data = DF_imdb.to_dict(orient='records')
         
         if len(data)>0:
             print('Getting metadata from IMDB')
-            myworker = ThreadedWorker(data, self._update_imdb_info_entry)
+            myworker = ThreadedWorker(data, self.db._update_imdb_info_entry)
             myworker.start_processing()
             
     def _get_download_filename_from_url(self, URL):
@@ -395,7 +384,7 @@ def main(headless=True):
     parser.add_argument("--quality", help="Set quality: high (H), medium (M), low (L)", default="M",type=str, choices=["H", "M", "L"])
     parser.add_argument("--channel", help="Comma seperated channel keywords", default="",type=str)
     parser.add_argument("--exclude", help="Comma seperated exclude keywords", default="Audiodeskription,(ita),(swe)",type=str)
-    parser.add_argument("--min-duration", help="Minimum duration in minutes", default=10,type=int)
+    parser.add_argument("--min-duration", help="Minimum duration in minutes", default=20,type=int)
     parser.add_argument("--free", help="Minimum free disk space (GB)", default=20,type=float)
     parser.add_argument("-q", help="Quick mode: Do not memorize downloaded content and download to current directory", action="store_true")
     parser.add_argument("--file", help="Do not create directory for each source", action="store_true")

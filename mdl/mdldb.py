@@ -6,11 +6,12 @@ from contextlib import contextmanager
 import os
 import json
 import re
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_, Table
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, joinedload
 from datetime import datetime, timedelta, timezone
 from PyMovieDb import IMDB
+import pandas as pd
 local_timezone = timezone(timedelta(hours=1))
 
 # import modules
@@ -40,8 +41,8 @@ class Meta(Base):
 class Source(Base):
     __tablename__ = 'source'
     id = Column(String, primary_key=True)
-    imbd_id = Column(String)
-    imbd_parsed = Column(Boolean, default=False)
+    imdb_id = Column(String)
+    imdb_parsed = Column(Boolean, default=False)
     channel = Column(String)
     topic = Column(String)
     title = Column(String)
@@ -83,6 +84,8 @@ class DataBaseManager:
         self.ensure_all_tables()
         
         self.update_fileformat_from_url_video()
+        
+        self.imdb = IMDB()
 
     @contextmanager
     def get_session(self):
@@ -108,6 +111,69 @@ class DataBaseManager:
             if entry:
                 session.delete(entry)
                 session.commit()
+                
+    def _get_downloaded(self, within=None):
+        with self.get_session() as session:
+            query = (
+                session.query(Downloaded, Source, IMDBEntry)
+                .join(Source, Source.id == Downloaded.source_id)
+                .outerjoin(IMDBEntry, Source.imdb_id == IMDBEntry.imdb_id)
+            )
+            
+            if within is not None:
+                if isinstance(within, int):
+                    within = timedelta(days=within)
+                elif not isinstance(within, timedelta):
+                    raise ValueError("within muss ein timedelta-Objekt oder ein ganzzahliger Wert sein, der in Tagen gezählt wird.")
+                
+                query = query.filter(Downloaded.timestamp >= (datetime.now() - within))
+
+            downloaded_items = query.all()
+
+            downloaded_list = []
+            for downloaded, source, imdb_entry in downloaded_items:
+                item_info = {
+                    'did': downloaded.did,
+                    'timestamp': downloaded.timestamp,
+                    'source_id': downloaded.source_id,
+                    'channel': source.channel,
+                    'topic': source.topic,
+                    'parsed': source.imdb_parsed,
+                    'title': source.title,
+                    'description': source.description,
+                    'size': source.size,
+                    'imdb_id': source.imdb_id,
+                    'imdb_parsed': source.imdb_parsed,
+                    'typ': None,
+                    'name': None,
+                    'rating': None,
+                    'genre': None,
+                    'published': None,
+                }
+                if imdb_entry:
+                    item_info.update({
+                        'imdb_id': imdb_entry.imdb_id,
+                        'typ': imdb_entry.typ,
+                        'name': imdb_entry.name,
+                        'rating': imdb_entry.rating,
+                        'genre': imdb_entry.genre,
+                        'published': imdb_entry.published,
+                    })
+                downloaded_list.append(item_info)
+            
+            DF_downloaded = pd.DataFrame(downloaded_list).sort_values('timestamp', ascending=True)
+
+            return DF_downloaded
+        
+    def _fill_imdb_info_on_downloaded_items(self):
+        DF_imdb = self._get_downloaded(within=7)
+        
+        DF_imdb = DF_imdb[DF_imdb['imdb_parsed']==False][['source_id','title']]
+        data = DF_imdb.to_dict(orient='records')
+        
+        if len(data)>0:
+            myworker = ThreadedWorker(data, self._update_imdb_info_entry, info='Getting metadata from IMDB for downloaded items')
+            myworker.start_processing()
         
     def _reparse_imdb_item(self, imdb_id):
         try:
@@ -126,7 +192,6 @@ class DataBaseManager:
         
         if len(data)>0:
             print('Cleanup IMDB data')
-            self.imdb = IMDB()
             myworker = ThreadedWorker(data, self._reparse_imdb_item)
             myworker.start_processing()
 
@@ -169,11 +234,32 @@ class DataBaseManager:
                 IMDBEntry.rating.isnot(None),
                 IMDBEntry.published >= datetime(year, 1, 1),
                 not_(IMDBEntry.genre.like('%Documentary%')),
-                not_(IMDBEntry.genre.like('%Biography%'))
+                not_(IMDBEntry.genre.like('%Biography%')),
+                not_(IMDBEntry.genre.like('%Short%'))
             ).all()
             for entry in existing_entries:
                 ratings[entry.imdb_id] = entry.rating
         return ratings
+    
+    def _get_all_imdb_ids(self):
+        """
+        Gibt alle IMDb-IDs in der Datenbank zurück.
+        
+        :return: Eine Liste aller IMDb-IDs in der Datenbank
+        """
+        with self.get_session() as session:
+            all_ids = session.query(IMDBEntry.imdb_id).all()
+            return [entry.imdb_id for entry in all_ids]
+        
+    def _update_imdb_info_entry(self, source_id=None, title=None, tv=False):
+        try:
+            entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv))
+            if entry.get('status', 200) == 200:
+                self._add_imdb_entry(entry, source_id=source_id)
+        except Exception as e:
+            print(f"Error updating IMDB info for title '{title}': {e}")
+        finally:
+            self.save_sources([{'id': source_id, 'imdb_parsed': True}])
 
     def _add_imdb_entry(self, entry, source_id=None):
         """
@@ -200,13 +286,14 @@ class DataBaseManager:
                         setattr(existing_entry, key, value)
                 else:
                     # Add new entry
+                    print('ADDING ENTRY')
                     source_data['imdb_id'] = imdb_id
                     session.add(IMDBEntry(**source_data))
                 
                 session.commit()
 
                 if source_id:
-                    self.save_sources([{'id':source_id, 'imbd_id':imdb_id, 'imbd_parsed':True}])
+                    self.save_sources([{'id':source_id, 'imdb_id':imdb_id, 'imdb_parsed':True}])
 
     @staticmethod
     def load_json_or_use_dict(input_data):
@@ -240,6 +327,24 @@ class DataBaseManager:
             session.commit()
     
     def ensure_all_tables(self):
+        ## clean up typo in database
+        inspector = inspect(self.engine)
+        
+        if inspector.has_table('source'):
+            source_table = Table('source', MetaData(), autoload=True, autoload_with=self.engine)
+
+            columns_to_rename = {
+                'imbd_id': 'imdb_id',
+                'imbd_parsed': 'imdb_parsed'
+            }
+            
+            with self.engine.connect() as connection:
+                for old_col, new_col in columns_to_rename.items():
+                    if old_col in source_table.columns:
+                        connection.execute(f"ALTER TABLE source RENAME COLUMN {old_col} TO {new_col}")
+                        print(f"Die Spalte '{old_col}' in der Tabelle 'Source' wurde erfolgreich in '{new_col}' umbenannt.")
+       
+        
         Base.metadata.create_all(self.engine)
         
         # Create a MetaData object
@@ -398,8 +503,8 @@ class DataBaseManager:
                     'size': size_mb,
                     'channel' : source.channel,
                     'format' : source.fileformat,
-                    'imdb' : source.imbd_id,
-                    'imdb_parsed' : source.imbd_parsed==True,
+                    'imdb' : source.imdb_id,
+                    'imdb_parsed' : source.imdb_parsed==True,
                 }
                 if website:
                     data['website'] = source.url_website
