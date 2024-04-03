@@ -261,7 +261,11 @@ class DataBaseManager:
         
     def _update_imdb_info_entry(self, source_id=None, title=None, tv=False, year=None):
         try:
-            year = None if year is None or isinstance(year, str) or isinstance(year, int) else int(year)
+            try:
+                year = int(year)
+            except:
+                year = None
+
             entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv, year=year))
             if entry.get('status', 200) == 200:
                 self._add_imdb_entry(entry, source_id=source_id)
