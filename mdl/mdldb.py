@@ -111,6 +111,14 @@ class DataBaseManager:
                 session.delete(entry)
                 session.commit()
                 
+    def _reset_imdb(self):
+        with self.get_session() as session:
+            # Set the imdb_id column to None for all entries in the Source table
+            session.query(Source).update({Source.imdb_id: None, Source.imdb_parsed: False})
+            # Delete all entries in the imdb table
+            session.query(IMDBEntry).delete()
+            session.commit()
+                
     def _get_downloaded(self, within=None):
         with self.get_session() as session:
             query = (
@@ -251,9 +259,9 @@ class DataBaseManager:
             all_ids = session.query(IMDBEntry.imdb_id).all()
             return [entry.imdb_id for entry in all_ids]
         
-    def _update_imdb_info_entry(self, source_id=None, title=None, tv=False):
+    def _update_imdb_info_entry(self, source_id=None, title=None, tv=False, year=None):
         try:
-            entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv))
+            entry = self.load_json_or_use_dict(self.imdb.get_by_name(title, tv=tv, year=int(year)))
             if entry.get('status', 200) == 200:
                 self._add_imdb_entry(entry, source_id=source_id)
         except Exception as e:

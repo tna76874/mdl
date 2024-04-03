@@ -66,6 +66,7 @@ class mdownloader:
                     'imdb': None,
                     'threads': 10,
                     'year' : 2000,
+                    'imdb_reset' : False,
                     }
         self.args.update(kwargs)
         self.args['series_filter'] = [k.strip() for k in self.args['series_filter'].split(';')]
@@ -90,7 +91,8 @@ class mdownloader:
                 
             os.remove(self.args['logfile'])
 
-           
+        if (self.args['imdb_reset'] == False): self.db._reset_imdb()
+
         if (self.args['search'] != None) & (not self.args['series']): self.get_info()
         
         if self.args['mark_done']: self.mark_as_done()
@@ -135,6 +137,31 @@ class mdownloader:
                         self.db.add_metadata([{'source_id': row['id'], 'season': season, 'episode': episode}])
                 except:
                     pass
+
+    def _parse_movie_info(self, movie):
+        # Regular Expression, um den Titel, das Land und das Jahr zu extrahieren
+        pattern = r"^(.*?) - Spielfilm, (.*?)(?: (\d{4}))(?: .*)?$"
+        match = re.match(pattern, movie)
+        
+        if match:
+            title = match.group(1)
+            country = match.group(2)
+            year = match.group(3)
+            return {"title": title, "land": country, "year": year}
+        else:
+            return {}
+    
+    def _apply_parse_movie_info(self, df):
+        # Anwenden der Methode auf die Spalte "title"
+        parsed_info = df['title'].apply(self._parse_movie_info)
+        
+        # Konvertieren des Ergebnisses in einen DataFrame
+        parsed_df = pd.DataFrame(parsed_info.tolist(), index=df.index)
+        
+        # Hinzufügen der neuen Spalten zum ursprünglichen DataFrame
+        df[['p_title', 'p_land', 'p_year']] = parsed_df[['title', 'land', 'year']]
+        
+        return df
     
     def get_links(self):
         self._reset_dataframe()
@@ -196,13 +223,15 @@ class mdownloader:
             DF_links.sort_values('timestamp',inplace=True)
             
             if self.args['imdb']!=None:
+                DF_links = self._apply_parse_movie_info(DF_links)
+                DF_links = DF_links.dropna(subset=['p_title'])
                 self._update_imdb_info(DF_links)
                 DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values, year=self.args['year']))
                 DF_links = DF_links[DF_links['rating']>=self.args['imdb']]
                 DF_links = DF_links.sort_values(by='size', ascending=False).drop_duplicates(subset='imdb', keep='first')
             
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
-                
+            
             self.DF_links = DF_links.reset_index(drop=True)
             
             if self.args['index']!=[]:
@@ -211,8 +240,8 @@ class mdownloader:
     def _update_imdb_info(self, DF_links):
         self.db._reparse_imdb_items()
         
-        DF_imdb = DF_links[DF_links['imdb_parsed']==False][['id','title']]
-        DF_imdb = DF_imdb.rename(columns={'id':'source_id'})
+        DF_imdb = DF_links[DF_links['imdb_parsed']==False][['id','p_title', 'p_year']]
+        DF_imdb = DF_imdb.rename(columns={'id':'source_id','p_title':'title','p_year':'year',})
         data = DF_imdb.to_dict(orient='records')
         
         if len(data)>0:
@@ -396,6 +425,7 @@ def main(headless=True):
     parser.add_argument("--series-filter", help="; (not comma) seperated series topics: e.g. Top-Serien zum Streamen;Drama-Serien", default='Top-Serien zum Streamen;Drama-Serien;Thriller-Serien;Comedy-Serien;Internationale Serien;neoriginal;Beliebte Serien;Krimi-Serien',type=str)
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
     parser.add_argument("--imdb", help="IMDB rating filter", type=float)
+    parser.add_argument("--imdb-reset", help="IMDB reset", action="store_true")
     parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int, default=2000)
     parser.add_argument("--version",  action="store_true", help=f"show version")
     parser.add_argument("--upgrade",  action="store_true", help=f"ensure latest version")
