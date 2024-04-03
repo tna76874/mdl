@@ -7,8 +7,7 @@ import os
 import json
 import re
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_, Table
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.orm import sessionmaker, joinedload, declarative_base
 from datetime import datetime, timedelta, timezone
 from PyMovieDb import IMDB
 import pandas as pd
@@ -331,8 +330,12 @@ class DataBaseManager:
         inspector = inspect(self.engine)
         
         if inspector.has_table('source'):
-            source_table = Table('source', MetaData(), autoload=True, autoload_with=self.engine)
-
+            metadata = MetaData()
+            source_table = Table('source', metadata,
+                                 Column('id', Integer, primary_key=True),
+                                 Column('imdb_id', String),
+                                 Column('imdb_parsed', String))
+        
             columns_to_rename = {
                 'imbd_id': 'imdb_id',
                 'imbd_parsed': 'imdb_parsed'
@@ -343,7 +346,6 @@ class DataBaseManager:
                     if old_col in source_table.columns:
                         connection.execute(f"ALTER TABLE source RENAME COLUMN {old_col} TO {new_col}")
                         print(f"Die Spalte '{old_col}' in der Tabelle 'Source' wurde erfolgreich in '{new_col}' umbenannt.")
-       
         
         Base.metadata.create_all(self.engine)
         
