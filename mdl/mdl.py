@@ -92,6 +92,8 @@ class mdownloader:
             os.remove(self.args['logfile'])
 
         if (self.args['imdb_reset'] == False): self.db._reset_imdb()
+        
+        if self.args['imdb']!=None: self.args['search']='Spielfilm,Kino Film,Filme im Ersten'
 
         if (self.args['search'] != None) & (not self.args['series']): self.get_info()
         
@@ -150,18 +152,48 @@ class mdownloader:
             return {"title": title, "land": country, "year": year}
         else:
             return {}
+
+    def _parse_film_info_from_description(self, multi_line_string):
+        pattern = r"Spielfilm (\w+) (\d{4})"
+        lines = multi_line_string.split('\n')
+        parsed_info = {}
+        for line in lines:
+            match = re.match(pattern, line.strip())
+            if match:
+                land = match.group(1)
+                jahr = match.group(2)
+                parsed_info["land"] = land
+                parsed_info["year"] = jahr
+                break
+        return parsed_info
     
     def _apply_parse_movie_info(self, df):
-        # Anwenden der Methode auf die Spalte "title"
-        parsed_info = df['title'].apply(self._parse_movie_info)
+        # Filtern der Zeilen, in denen 'p_title' None ist
+        df['p_title'] = None
+        none_mask = df['p_title'].isna()
         
-        # Konvertieren des Ergebnisses in einen DataFrame
-        parsed_df = pd.DataFrame(parsed_info.tolist(), index=df.index)
+        # Kopieren des ursprünglichen DataFrames, um Änderungen vorzunehmen
+        modified_df = df.copy()
         
-        # Hinzufügen der neuen Spalten zum ursprünglichen DataFrame
-        df[['p_title', 'p_land', 'p_year']] = parsed_df[['title', 'land', 'year']]
+        ## ALL TAGGED SPIELFILME
+        # Übernahme von 'p_title', 'p_land' und 'p_year' aus 'title', wo 'p_title' None ist
+        parsed_info = modified_df.loc[none_mask, 'title'].apply(self._parse_movie_info)
+        parsed_df = pd.DataFrame(parsed_info.tolist(), index=parsed_info.index)
+        modified_df.loc[none_mask, ['p_title', 'p_land', 'p_year']] = parsed_df[['title', 'land', 'year']].values
         
-        return df
+        # Filtern der Zeilen, in denen 'topic' den Wert 'Filme im Ersten' hat
+        first_channel_mask = modified_df['topic'] == 'Filme im Ersten'
+        
+        ### ARD FILME IM ERSTEN
+        # Parsed Informationen von 'description' mit '_parse_film_info_from_description' für 'p_land' und 'p_year'
+        parsed_info = modified_df.loc[first_channel_mask, 'description'].apply(self._parse_film_info_from_description)
+        parsed_df = pd.DataFrame(parsed_info.tolist(), index=parsed_info.index)
+        
+        # Hinzufügen der neuen Spalten 'p_land' und 'p_year' zum modifizierten DataFrame für 'Filme im Ersten'
+        modified_df.loc[first_channel_mask, ['p_land', 'p_year']] = parsed_df[['land', 'year']].values
+        modified_df.loc[first_channel_mask, 'p_title'] = modified_df.loc[first_channel_mask, 'title']
+        
+        return modified_df
     
     def get_links(self):
         self._reset_dataframe()

@@ -498,6 +498,8 @@ class DataBaseManager:
                 data = {
                     'id': source.id,
                     'title': source.title,
+                    'description': source.description,
+                    'topic': source.topic,
                     'link': link,
                     'duration': source.duration,
                     'timestamp': source.timestamp,
