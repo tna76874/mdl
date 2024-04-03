@@ -91,7 +91,7 @@ class mdownloader:
                 
             os.remove(self.args['logfile'])
 
-        if (self.args['imdb_reset'] == False): self.db._reset_imdb()
+        if (self.args['imdb_reset'] == True): self.db._reset_imdb()
         
         if self.args['imdb']!=None: self.args['search']='Spielfilm,Kino Film,Filme im Ersten,Filme'
 
