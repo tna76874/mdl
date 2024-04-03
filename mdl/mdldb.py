@@ -285,7 +285,6 @@ class DataBaseManager:
                         setattr(existing_entry, key, value)
                 else:
                     # Add new entry
-                    print('ADDING ENTRY')
                     source_data['imdb_id'] = imdb_id
                     session.add(IMDBEntry(**source_data))
                 
