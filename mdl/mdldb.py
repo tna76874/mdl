@@ -234,6 +234,7 @@ class DataBaseManager:
                 IMDBEntry.published >= datetime(year, 1, 1),
                 not_(IMDBEntry.genre.like('%Documentary%')),
                 not_(IMDBEntry.genre.like('%Biography%')),
+                not_(IMDBEntry.genre.like('%UNDEFINED%')),
                 not_(IMDBEntry.genre.like('%Short%'))
             ).all()
             for entry in existing_entries:
