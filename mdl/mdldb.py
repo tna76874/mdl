@@ -327,25 +327,16 @@ class DataBaseManager:
     
     def ensure_all_tables(self):
         ## clean up typo in database
-        inspector = inspect(self.engine)
-        
-        if inspector.has_table('source'):
-            metadata = MetaData()
-            source_table = Table('source', metadata,
-                                 Column('id', Integer, primary_key=True),
-                                 Column('imdb_id', String),
-                                 Column('imdb_parsed', String))
-        
-            columns_to_rename = {
-                'imbd_id': 'imdb_id',
-                'imbd_parsed': 'imdb_parsed'
-            }
-            
+        columns_to_rename = {
+            'imbd_id': 'imdb_id',
+            'imbd_parsed': 'imdb_parsed'
+        }
+        try:
             with self.engine.connect() as connection:
                 for old_col, new_col in columns_to_rename.items():
-                    if old_col in source_table.columns:
-                        connection.execute(f"ALTER TABLE source RENAME COLUMN {old_col} TO {new_col}")
-                        print(f"Die Spalte '{old_col}' in der Tabelle 'Source' wurde erfolgreich in '{new_col}' umbenannt.")
+                    connection.execute(text(f"ALTER TABLE source RENAME COLUMN {old_col} TO {new_col}"))
+        except:
+            pass
         
         Base.metadata.create_all(self.engine)
         
