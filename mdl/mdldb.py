@@ -283,7 +283,7 @@ class DataBaseManager:
         except Exception as e:
             print(f"Error updating IMDB info for title '{title}': {e}")
         finally:
-            self.save_sources([{'id': source_id, 'imdb_parsed': True}])
+            self.save_sources([{'id': source_id, 'imdb_parsed': True}], update = True)
 
     def _add_imdb_entry(self, entry, source_id=None):
         """
@@ -317,7 +317,7 @@ class DataBaseManager:
                 session.commit()
 
                 if source_id:
-                    self.save_sources([{'id':source_id, 'imdb_id':imdb_id, 'imdb_parsed':True}])
+                    self.save_sources([{'id':source_id, 'imdb_id':imdb_id, 'imdb_parsed':True}], update = True)
 
     @staticmethod
     def load_json_or_use_dict(input_data):

@@ -85,6 +85,8 @@ class mdownloader:
         
         self.db = DataBaseManager(configdir=self.args['configdir'])
         
+        self.print = ['title', 'channel']
+        
         if os.path.exists(self.args['logfile']) & ~self.args['q']:
             with open(self.args['logfile']) as f:
                 processed = [line.strip() for line in f.readlines()]
@@ -243,7 +245,7 @@ class mdownloader:
         except:
             DF_links = pd.DataFrame()
 
-        if not DF_links.empty:              
+        if not DF_links.empty:    
             #exclude useless sources
             excluded_tags = [
                             'Audiodeskription',
@@ -280,6 +282,8 @@ class mdownloader:
                 DF_links = DF_links[(DF_links['rating']>=self.args['imdb']) & (DF_links['ratingCount']>=self.args['count'])]
                 DF_links = DF_links.sort_values(by=['p_year', 'size'], ascending=[False, False])
                 DF_links = DF_links.drop_duplicates(subset='imdb', keep='first')
+                
+                self.print.extend(['rating'])
             
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
             
@@ -323,7 +327,7 @@ class mdownloader:
     def get_info(self):
         self.get_links()
         if not self.DF_links.empty:
-            print(self.DF_links[['title', 'channel']])
+            print(self.DF_links[self.print])
             print("Download {:d} movies ({:.1f}GB)".format(len(self.DF_links),float(self.DF_links['size'].sum()/1024)))
         else:
             print("No sources found!")
