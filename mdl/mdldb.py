@@ -404,7 +404,7 @@ class DataBaseManager:
                         # Print a message indicating that the column has been created
                         print(f"Column '{column.name}' added to table '{table_name}'.")
 
-    def save_sources(self, source_data_list):
+    def save_sources(self, source_data_list, update = False):
         with self.get_session() as session:
             for source_data in source_data_list:
                 source_id = source_data.get('id')
@@ -420,6 +420,7 @@ class DataBaseManager:
 
 
                 if existing_entry:
+                    if not update==True: continue
                     # Update existing entry
                     with session.begin_nested():
                         for key, value in source_data.items():
