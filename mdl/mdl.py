@@ -280,8 +280,9 @@ class mdownloader:
                 DF_links['rating'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('rating'))
                 DF_links['ratingCount'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('ratingCount'))
                 DF_links = DF_links[(DF_links['rating']>=self.args['imdb']) & (DF_links['ratingCount']>=self.args['count'])]
-                DF_links = DF_links.sort_values(by=['p_year', 'size'], ascending=[False, False])
+                DF_links = DF_links.sort_values(by=['rating', 'p_year', 'title'], ascending=[False, False, True])
                 DF_links = DF_links.drop_duplicates(subset='imdb', keep='first')
+                
                 
                 self.print.extend(['rating'])
             
