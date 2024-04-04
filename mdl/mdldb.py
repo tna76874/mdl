@@ -6,7 +6,7 @@ from contextlib import contextmanager
 import os
 import json
 import re
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_, Table
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Interval, BigInteger, Boolean, MetaData, inspect, text, not_, and_, or_, Table
 from sqlalchemy.orm import sessionmaker, joinedload, declarative_base
 from datetime import datetime, timedelta, timezone
 from PyMovieDb import IMDB
@@ -63,6 +63,7 @@ class IMDBEntry(Base):
     typ = Column(String)
     name = Column(String)
     rating = Column(Float)
+    ratingCount = Column(Integer)
     published = Column(DateTime)
     genre = Column(String)
 
@@ -163,6 +164,7 @@ class DataBaseManager:
                         'typ': imdb_entry.typ,
                         'name': imdb_entry.name,
                         'rating': imdb_entry.rating,
+                        'ratingCount': imdb_entry.ratingCount,
                         'genre': imdb_entry.genre,
                         'published': imdb_entry.published,
                     })
@@ -204,14 +206,23 @@ class DataBaseManager:
 
     def _get_imdb_id_to_reparse(self):
         """
-        Gibt eine Liste von IMDB-IDs zurück, bei denen das Genre None ist.
+        Gibt eine Liste von IMDB-IDs zurück, bei denen das Genre None ist oder bei denen rating nicht None und ratingCount None ist.
         """
         with self.get_session() as session:
             ids_to_reparse = []
-            entries_to_reparse = session.query(IMDBEntry).filter_by(genre=None).all()
+            entries_to_reparse = session.query(IMDBEntry).filter(
+                or_(
+                    IMDBEntry.genre == None,
+                    and_(
+                        IMDBEntry.rating != None,
+                        IMDBEntry.ratingCount == None
+                    )
+                )
+            ).all()
             for entry in entries_to_reparse:
                 ids_to_reparse.append(entry.imdb_id)
             return ids_to_reparse
+
     
     def drop_ratings_without_year(self):
         """
@@ -290,7 +301,8 @@ class DataBaseManager:
                     'name': entry.get('name'),
                     'rating': entry.get('rating', {}).get('ratingValue'),
                     'published': datetime.strptime(entry.get('datePublished') if entry.get('datePublished')!=None else '1970-01-01', "%Y-%m-%d"),
-                    'genre': ','.join(entry.get('genre') if entry.get('genre')!=None else ['UNDEFINED'])
+                    'genre': ','.join(entry.get('genre') if entry.get('genre')!=None else ['UNDEFINED']),
+                    'ratingCount' : entry.get('rating', {}).get('ratingCount'),
                 }
             
                 if existing_entry:
