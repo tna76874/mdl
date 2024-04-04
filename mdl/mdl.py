@@ -274,7 +274,9 @@ class mdownloader:
                 DF_links = self._apply_parse_movie_info(DF_links)
                 DF_links = DF_links.dropna(subset=['p_title'])
                 self._update_imdb_info(DF_links)
-                DF_links['rating'] = DF_links['imdb'].map(self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values, year=self.args['year']))
+                ratings = self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values, year=self.args['year'])
+                DF_links['rating'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('rating'))
+                DF_links['ratingCount'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('ratingCount'))
                 DF_links = DF_links[(DF_links['rating']>=self.args['imdb']) & (DF_links['ratingCount']>=self.args['count'])]
                 DF_links = DF_links.sort_values(by=['p_year', 'size'], ascending=[False, False])
                 DF_links = DF_links.drop_duplicates(subset='imdb', keep='first')

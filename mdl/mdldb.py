@@ -257,7 +257,7 @@ class DataBaseManager:
                 not_(IMDBEntry.genre.like('%Short%'))
             ).all()
             for entry in existing_entries:
-                ratings[entry.imdb_id] = entry.rating
+                ratings[entry.imdb_id] = {'rating' : entry.rating, 'ratingCount' : entry.ratingCount }
         return ratings
     
     def _get_all_imdb_ids(self):
