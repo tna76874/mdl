@@ -420,7 +420,6 @@ class DataBaseManager:
 
 
                 if existing_entry:
-                    if not update==True: continue
                     # Update existing entry
                     with session.begin_nested():
                         for key, value in source_data.items():
