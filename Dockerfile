@@ -9,9 +9,12 @@ WORKDIR /build
 RUN pip install --upgrade pip
 RUN pip install . && pip install -r requirements.txt
 
-COPY ./docker-entrypoint.sh /
+RUN groupadd -r -g 1000 worker && \
+    useradd -r -g worker -u 1033 -d /home/worker -s /bin/bash worker
+
+COPY --chown=worker:worker ./docker-entrypoint.sh /
 RUN chmod 775 /docker-entrypoint.sh
 
-WORKDIR /usr/src/app
+WORKDIR /home/worker
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
