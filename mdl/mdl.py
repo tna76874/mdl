@@ -279,12 +279,12 @@ class mdownloader:
                 ratings = self.db.get_ratings_for_imdb_ids(DF_links['imdb'].values, year=self.args['year'])
                 DF_links['rating'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('rating'))
                 DF_links['ratingCount'] = DF_links['imdb'].map(lambda k: ratings.get(k,{}).get('ratingCount'))
+                DF_links['year'] = DF_links['p_year'].apply(lambda x: str(int(x)) if pd.notna(x) else '---')
                 DF_links = DF_links[(DF_links['rating']>=self.args['imdb']) & (DF_links['ratingCount']>=self.args['count'])]
                 DF_links = DF_links.sort_values(by=['rating', 'p_year', 'title'], ascending=[False, False, True])
                 DF_links = DF_links.drop_duplicates(subset='imdb', keep='first')
                 
-                
-                self.print.extend(['rating'])
+                self.print.extend(['rating', 'year'])
             
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
             
