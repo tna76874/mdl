@@ -174,6 +174,8 @@ class mdownloader:
     def _apply_parse_movie_info(self, df):
         # Filtern der Zeilen, in denen 'p_title' None ist
         df['p_title'] = None
+        df['p_land'] = None
+        df['p_year'] = None
         none_mask = df['p_title'].isna()
         
         # Kopieren des ursprünglichen DataFrames, um Änderungen vorzunehmen
