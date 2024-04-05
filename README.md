@@ -30,3 +30,9 @@ pip3 install --upgrade .
 ./run.sh
 ```
 
+or
+
+```bash
+docker run --rm -v $PWD/download:/download -v $PWD/config:/config ghcr.io/tna76874/mdl:latest --version
+```
+

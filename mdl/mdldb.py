@@ -432,6 +432,8 @@ class DataBaseManager:
                         session.add(source_entry)
             
             session.commit()
+    
+        self.update_fileformat_from_url_video()
                 
     def add_metadata(self, metadata_list):
         with self.get_session() as session:
