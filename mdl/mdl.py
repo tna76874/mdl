@@ -187,8 +187,8 @@ class mdownloader:
             parsed_info = modified_df.loc[none_mask, 'title'].apply(self._parse_movie_info)
             parsed_df = pd.DataFrame(parsed_info.tolist(), index=parsed_info.index)
             modified_df.loc[none_mask, ['p_title', 'p_land', 'p_year']] = parsed_df[['title', 'land', 'year']].values
-        except:
-            pass
+        except Exception as e:
+            print(f'{e}')
                 
         try:
             # Filtern der Zeilen, in denen 'topic' den Wert 'Filme im Ersten' hat
@@ -201,16 +201,16 @@ class mdownloader:
             # Hinzufügen der neuen Spalten 'p_land' und 'p_year' zum modifizierten DataFrame für 'Filme im Ersten'
             modified_df.loc[first_channel_mask, ['p_land', 'p_year']] = parsed_df[['land', 'year']].values
             modified_df.loc[first_channel_mask, 'p_title'] = modified_df.loc[first_channel_mask, 'title']
-        except:
-            pass
+        except Exception as e:
+            print(f'{e}')
         
         try:
             ### ARD FILME
             # Übernahme von 'p_title' aus 'title', wo 'channel' den Wert 'ARD' und 'topic' den Wert 'Filme' hat
             ard_filme_mask = (modified_df['channel'] == 'ARD') & (modified_df['topic'] == 'Filme')
             modified_df.loc[ard_filme_mask, 'p_title'] = modified_df.loc[ard_filme_mask, 'title']       
-        except:
-            pass
+        except Exception as e:
+            print(f'{e}')
         
         return modified_df
     
