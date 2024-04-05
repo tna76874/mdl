@@ -1,6 +1,4 @@
-FROM python:3.7.7
-
-
+FROM python:3.11
 
 RUN mkdir /build
 RUN mkdir /config
@@ -11,6 +9,9 @@ WORKDIR /build
 RUN pip install --upgrade pip
 RUN pip install .
 
+COPY ./docker-entrypoint.sh /
+RUN chmod 775 /docker-entrypoint.sh
+
 WORKDIR /usr/src/app
 
-CMD [ "/usr/local/bin/mdl" , "--config", "/config", "--download", "/download", "--run"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
