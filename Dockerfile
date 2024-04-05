@@ -7,7 +7,7 @@ RUN mkdir /download
 COPY . /build
 WORKDIR /build
 RUN pip install --upgrade pip
-RUN pip install .
+RUN pip install . && pip install -r requirements.txt
 
 COPY ./docker-entrypoint.sh /
 RUN chmod 775 /docker-entrypoint.sh
