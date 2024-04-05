@@ -284,7 +284,7 @@ class mdownloader:
                 DF_links = DF_links.sort_values(by=['rating', 'p_year', 'title'], ascending=[False, False, True])
                 DF_links = DF_links.drop_duplicates(subset='imdb', keep='first')
                 
-                self.print.extend(['rating', 'year'])
+                self.print.extend(['rating', 'year', 'imdb'])
             
             if self.args['title']: DF_links['title'] = DF_links['title'].apply(lambda x: x.split(' - ')[0])
             
