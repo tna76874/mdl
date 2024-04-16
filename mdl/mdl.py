@@ -216,36 +216,43 @@ class mdownloader:
     
     def get_links(self):
         self._reset_dataframe()
-
-        QUERIES = [{'fields': ['title', 'topic'],'query': k} for k in self.args['search'].split(',')]
-        if self.args['channel'].split(',') != ['']: QUERIES += [{'fields': ['channel'],'query': k} for k in self.args['channel'].split(',')]
-        DF_links = pd.DataFrame()
-        skip = 0
-        while True:
-            data =      {  
-                        'queries': QUERIES,
-                        'sortBy': 'timestamp',
-                        'sortOrder': 'desc',
-                        'future': 'true',
-                        'offset': skip,
-                        'size': 50,
-                        'duration_min': 20,
-                        'duration_max': 10000,
-                        }
-            try:
-                DF_tmp = pd.DataFrame(requests.post('https://mediathekviewweb.de/api/query',  json=data, headers={'content-type': 'text/plain'}).json()['result']['results'])
-                DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
-                skip+=50
-                if len(DF_tmp)==0: break
-            except:
-                break
         
-        self.db.save_sources(DF_links.to_dict(orient='records'))
-        
-        try:
-            DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=(self.args['q']==False) and (not self.args['mark_undone']), quality=self.args['quality']))
-        except:
+        if self.args.get('no_query', False)==False:
+            QUERIES = [{'fields': ['title', 'topic'],'query': k} for k in self.args['search'].split(',')]
+            if self.args['channel'].split(',') != ['']: QUERIES += [{'fields': ['channel'],'query': k} for k in self.args['channel'].split(',')]
             DF_links = pd.DataFrame()
+            skip = 0
+            while True:
+                data =      {  
+                            'queries': QUERIES,
+                            'sortBy': 'timestamp',
+                            'sortOrder': 'desc',
+                            'future': 'true',
+                            'offset': skip,
+                            'size': 50,
+                            'duration_min': 20,
+                            'duration_max': 10000,
+                            }
+                try:
+                    DF_tmp = pd.DataFrame(requests.post('https://mediathekviewweb.de/api/query',  json=data, headers={'content-type': 'text/plain'}).json()['result']['results'])
+                    DF_links = pd.concat([DF_links, DF_tmp], ignore_index=True)
+                    skip+=50
+                    if len(DF_tmp)==0: break
+                except:
+                    break
+            
+            self.db.save_sources(DF_links.to_dict(orient='records'))
+        
+            try:
+                DF_links = pd.DataFrame(self.db.get_source_on_id(DF_links['id'].values, only_not_downloaded=(self.args['q']==False) and (not self.args['mark_undone']), quality=self.args['quality']))
+            except:
+                DF_links = pd.DataFrame()
+                
+        else:
+            try:
+                DF_links = pd.DataFrame(self.db.get_source_on_id(self.db.get_imdb_entry_over(score=self.args.get('imdb',7)), only_not_downloaded=(self.args['q']==False) and (not self.args['mark_undone']), quality=self.args['quality']))
+            except:
+                DF_links = pd.DataFrame()    
 
         if not DF_links.empty:    
             #exclude useless sources
@@ -512,6 +519,7 @@ def main(headless=True):
     parser.add_argument("--index", help="Additional search parameter to select sources", nargs='+', type=int, default=[])
     parser.add_argument("--imdb", help="IMDB rating filter", type=float)
     parser.add_argument("--imdb-reset", help="IMDB reset", action="store_true")
+    parser.add_argument("--no-query", help="Directely use sources from local database", action="store_true")
     parser.add_argument("--nfo", help="create movies.nfo in download folder", action="store_true")
     parser.add_argument("--year", help="Minimum year for IMDB rating filter", type=int, default=2000)
     parser.add_argument("--version",  action="store_true", help=f"show version")

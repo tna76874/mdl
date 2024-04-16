@@ -236,6 +236,14 @@ class DataBaseManager:
                 session.delete(entry)
             session.commit()
 
+    def get_imdb_entry_over(self, score = 7):
+        with self.get_session() as session:
+            source_ids_with_score = session.query(Source.id).join(IMDBEntry, Source.imdb_id == IMDBEntry.imdb_id).filter(
+                IMDBEntry.rating >= score
+            ).distinct().all()
+            source_ids_list = [source_id for (source_id,) in source_ids_with_score]
+            return source_ids_list
+
     def get_ratings_for_imdb_ids(self, imdb_ids, year=2000):
         """
         Ruft Bewertungen für eine Liste von IMDb-IDs ab.
