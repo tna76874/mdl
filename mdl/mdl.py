@@ -115,6 +115,19 @@ class mdownloader:
     def processed(self, itemid):
         return self.db.is_downloaded(itemid)
     
+    def _extract_title_season_episode_dict(self, text):
+        pattern = r'\(S(\d{2})[- /]?[Ee]?(\d{2})\)'
+        match = re.search(pattern, text)
+        
+        if match:
+            season = int(match.group(1))
+            episode = int(match.group(2))
+            title = re.sub(pattern, '', text).strip()
+            return {"title": title, "season": season, "episode": episode}
+        else:
+            return {"title": text, "season": None, "episode": None}
+
+    
     def get_series_metadata_from_id(self, id_list):
         DF_links = pd.DataFrame(self.db.get_source_on_id(id_list, only_not_downloaded=False, website=True))
         for _, row in DF_links.iterrows():
@@ -409,7 +422,16 @@ class mdownloader:
 
     def download_movies(self):
         for i, row in self.DF_links.iterrows():
+            # parse season and episode from title
+            series_parse = self._extract_title_season_episode_dict(row['title'])
+            row['title'] = series_parse.get('title', row['title'])
+            if series_parse['season'] is not None and series_parse['episode'] is not None:
+                self.db.add_metadata([{'source_id': row['id'], 'season': series_parse['season'], 'episode': series_parse['episode']}])
+            
+            # parse season and episode from website
             self.get_series_metadata_from_id([row['id']])
+            
+            # get parsed info
             meta = self.db.get_metadata(row['id'])
             
             TITLE = slugify(row['title'], separator='_', lowercase=False)
